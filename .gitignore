@@ -1,0 +1,10 @@
+data/
+data-test/
+.env
+node_modules/
+.pytest_cache/
+
+# Legacy experiments (keep locally, not in v1.0 repo)
+tony/
+tony-ai/
+*.db
