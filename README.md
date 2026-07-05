@@ -34,8 +34,26 @@ npm run chat         # Interactive CLI
 | Vault | Obsidian | `OBSIDIAN_VAULT_PATH=./vault` |
 | Builder | Paul | `POST /api/agents/paul/build` |
 | Runtime | Charlie OS | `npm run charlie` |
+| MCP | Perplexity, Firecrawl, QuickBooks, Higgsfield, Playwright | See `.env.example` |
+| Goals | Loop until success criteria met | `goal_run` tool, `POST /api/goals/run` |
 
-## CLI
+## v2.1 — MCP + Goals + Integrations
+
+```powershell
+npm run integrations:init    # Clone 12 GitHub repos locally
+npm run integrations:status
+```
+
+**MCP tools:** `perplexity_search`, `firecrawl_scrape`, `quickbooks_query`, `higgsfield_generate`, `playwright_snapshot`, `deep_research`
+
+**Goal-driven:** Create goals with success criteria — TONY loops until `test:npm test`, `file exists:`, or LLM verification passes.
+
+**Skills:** impeccable-design, ponytail, superpowers, goal-driven, research-multi
+
+**Context:** `context/CLAUDE.md`, `context/AGENTS.md`, karpathy guidelines, subconscious, enterprise hardening
+
+**Bundled repos:** superpowers, awesome-claude-code, claude-squad, karpathy-guidelines, claude-subconscious, playwright-mcp, tdd-guardian, wshobson-agents, repomix, everything-claude-code, ponytail, impeccable
+
 
 ```bash
 npm run chat                    # Interactive session

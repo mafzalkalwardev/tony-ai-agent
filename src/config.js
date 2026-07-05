@@ -41,6 +41,36 @@ module.exports = {
     vaultPath: env('OBSIDIAN_VAULT_PATH', path.join(root, 'vault')),
     brainFolder: env('OBSIDIAN_BRAIN_FOLDER', 'Agentic Brain'),
   },
+  mcp: {
+    perplexity: {
+      apiKey: env('PERPLEXITY_API_KEY'),
+      model: env('PERPLEXITY_MODEL', 'sonar'),
+      baseUrl: env('PERPLEXITY_BASE_URL', 'https://api.perplexity.ai'),
+    },
+    firecrawl: {
+      apiKey: env('FIRECRAWL_API_KEY'),
+      baseUrl: env('FIRECRAWL_BASE_URL', 'https://api.firecrawl.dev/v1'),
+    },
+    quickbooks: {
+      clientId: env('QUICKBOOKS_CLIENT_ID'),
+      clientSecret: env('QUICKBOOKS_CLIENT_SECRET'),
+      refreshToken: env('QUICKBOOKS_REFRESH_TOKEN'),
+      realmId: env('QUICKBOOKS_REALM_ID'),
+      sandbox: env('QUICKBOOKS_SANDBOX', 'true') === 'true',
+    },
+    higgsfield: {
+      apiKey: env('HIGGSFIELD_API_KEY'),
+      baseUrl: env('HIGGSFIELD_BASE_URL', 'https://platform.higgsfield.ai'),
+    },
+    playwright: {
+      mcpUrl: env('PLAYWRIGHT_MCP_URL', ''),
+    },
+  },
+  goals: {
+    maxRounds: Number(env('TONY_GOAL_MAX_ROUNDS', '10')),
+    autoRun: env('TONY_GOAL_AUTO_RUN', 'true') === 'true',
+  },
+  integrationsDir: path.join(root, 'integrations'),
   maxIterations: Number(env('TONY_MAX_ITERATIONS', '12')),
   autoReflect: env('TONY_AUTO_REFLECT', 'true') === 'true',
   workspaceRoot: path.resolve(root, env('TONY_WORKSPACE_ROOT', '.')),
@@ -54,5 +84,6 @@ module.exports = {
   identityPath: path.join(root, 'TONY.md'),
   skillsDirs: [
     path.join(root, 'skills'),
+    path.join(root, 'integrations', 'skills'),
   ].filter((d) => fs.existsSync(d)),
 };

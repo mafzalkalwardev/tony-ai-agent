@@ -22,13 +22,18 @@ function auth(req, res, next) {
 
 app.get('/health', (_req, res) => {
   const architectures = require('../brain/architectures');
+  const mcp = require('../mcp');
+  const goalStore = require('../goals/store');
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.0.0',
+    version: '2.1.0',
     llm: config.llmProvider,
     skills: require('../skills/loader').listSkills().length,
+    tools: require('../tools/registry').listTools().length,
     mind: architectures.status(),
+    mcp: mcp.statusAll(),
+    goals: { active: goalStore.list('active').length, completed: goalStore.list('completed').length },
   });
 });
 
@@ -142,6 +147,82 @@ app.post('/api/agents/paul/build', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+app.get('/api/mcp/status', auth, (_req, res) => {
+  res.json(require('../mcp').statusAll());
+});
+
+app.post('/api/mcp/research', auth, async (req, res) => {
+  try {
+    const { query } = req.body || {};
+    if (!query) return res.status(400).json({ error: 'query required' });
+    res.json(await require('../mcp').research(query));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/research/deep', auth, async (req, res) => {
+  try {
+    const { query, scrape_url, browser_url } = req.body || {};
+    if (!query) return res.status(400).json({ error: 'query required' });
+    res.json(await require('../knowledge/research').deepResearch(query, {
+      scrapeUrl: scrape_url,
+      browserUrl: browser_url,
+      searchRepos: true,
+    }));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/goals', auth, (req, res) => {
+  const goalStore = require('../goals/store');
+  res.json({ goals: goalStore.list(req.query.status) });
+});
+
+app.post('/api/goals', auth, (req, res) => {
+  const { title, description, successCriteria, tags } = req.body || {};
+  if (!title) return res.status(400).json({ error: 'title required' });
+  const goal = require('../goals/store').create({
+    title,
+    description,
+    successCriteria: successCriteria || [],
+    tags,
+  });
+  res.json({ ok: true, goal });
+});
+
+app.post('/api/goals/run', auth, async (req, res) => {
+  try {
+    const { goalId, title, description, successCriteria, maxRounds, sessionId = randomUUID() } =
+      req.body || {};
+    const runner = require('../goals/runner');
+    if (goalId) {
+      res.json(await runner.runGoal({ goalId, sessionId, maxRounds }));
+      return;
+    }
+    if (title && successCriteria?.length) {
+      res.json(
+        await runner.runGoalFromText({
+          title,
+          description,
+          successCriteria,
+          sessionId,
+          maxRounds,
+        })
+      );
+      return;
+    }
+    res.status(400).json({ error: 'goalId or title+successCriteria required' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/integrations/manifest', auth, (_req, res) => {
+  res.json(require('../../integrations/manifest.json'));
 });
 
 const server = http.createServer(app);

@@ -177,6 +177,204 @@ const builtins = {
     },
   },
 
+  perplexity_search: {
+    name: 'perplexity_search',
+    description: 'Research the internet via Perplexity MCP with citations',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+    async execute({ query }) {
+      return require('../mcp/perplexity').search(query);
+    },
+  },
+
+  firecrawl_scrape: {
+    name: 'firecrawl_scrape',
+    description: 'Scrape a URL to markdown via Firecrawl MCP',
+    parameters: {
+      type: 'object',
+      properties: { url: { type: 'string' } },
+      required: ['url'],
+    },
+    async execute({ url }) {
+      return require('../mcp/firecrawl').scrape(url);
+    },
+  },
+
+  firecrawl_search: {
+    name: 'firecrawl_search',
+    description: 'Search the web via Firecrawl MCP',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+    async execute({ query }) {
+      return require('../mcp/firecrawl').search(query);
+    },
+  },
+
+  quickbooks_query: {
+    name: 'quickbooks_query',
+    description: 'Run QuickBooks SQL query via MCP (requires OAuth tokens)',
+    parameters: {
+      type: 'object',
+      properties: { sql: { type: 'string' } },
+      required: ['sql'],
+    },
+    async execute({ sql }) {
+      return require('../mcp/quickbooks').query(sql);
+    },
+  },
+
+  higgsfield_generate: {
+    name: 'higgsfield_generate',
+    description: 'Generate image or video via Higgsfield API',
+    parameters: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['image', 'video'] },
+        prompt: { type: 'string' },
+        image_url: { type: 'string' },
+      },
+      required: ['type', 'prompt'],
+    },
+    async execute({ type, prompt, image_url }) {
+      const hf = require('../mcp/higgsfield');
+      if (type === 'video' && image_url) return hf.imageToVideo(prompt, image_url);
+      return hf.textToImage(prompt);
+    },
+  },
+
+  playwright_snapshot: {
+    name: 'playwright_snapshot',
+    description: 'Browser snapshot via Playwright MCP (or fetch fallback)',
+    parameters: {
+      type: 'object',
+      properties: { url: { type: 'string' } },
+      required: ['url'],
+    },
+    async execute({ url }) {
+      return require('../mcp/playwright').snapshot(url);
+    },
+  },
+
+  deep_research: {
+    name: 'deep_research',
+    description: 'Multi-structure research: graphify + repos + Obsidian + Perplexity/Firecrawl',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        scrape_url: { type: 'string' },
+        browser_url: { type: 'string' },
+      },
+      required: ['query'],
+    },
+    async execute({ query, scrape_url, browser_url }) {
+      return require('../knowledge/research').deepResearch(query, {
+        scrapeUrl: scrape_url,
+        browserUrl: browser_url,
+        searchRepos: true,
+      });
+    },
+  },
+
+  knowledge_structures: {
+    name: 'knowledge_structures',
+    description: 'Query multiple knowledge structures (graph, tree, vault, repo, web)',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+    async execute({ query }) {
+      const structures = require('../knowledge/structures');
+      const result = await structures.queryAll(query);
+      return { ok: true, ...result, formatted: structures.formatForAgent(result) };
+    },
+  },
+
+  goal_create: {
+    name: 'goal_create',
+    description: 'Create a persistent goal with success criteria',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        success_criteria: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['title', 'success_criteria'],
+    },
+    async execute({ title, description, success_criteria }) {
+      const goal = require('../goals/store').create({
+        title,
+        description: description || title,
+        successCriteria: success_criteria,
+      });
+      return { ok: true, goal };
+    },
+  },
+
+  goal_run: {
+    name: 'goal_run',
+    description: 'Run agent loop until goal success criteria are met',
+    parameters: {
+      type: 'object',
+      properties: {
+        goal_id: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        success_criteria: { type: 'array', items: { type: 'string' } },
+        max_rounds: { type: 'number' },
+      },
+    },
+    async execute(args, sessionId) {
+      const runner = require('../goals/runner');
+      if (args.goal_id) {
+        return runner.runGoal({ goalId: args.goal_id, sessionId, maxRounds: args.max_rounds });
+      }
+      if (args.title && args.success_criteria?.length) {
+        return runner.runGoalFromText({
+          title: args.title,
+          description: args.description,
+          successCriteria: args.success_criteria,
+          sessionId,
+          maxRounds: args.max_rounds,
+        });
+      }
+      return { ok: false, error: 'Provide goal_id or title+success_criteria' };
+    },
+  },
+
+  goal_list: {
+    name: 'goal_list',
+    description: 'List active or completed goals',
+    parameters: {
+      type: 'object',
+      properties: { status: { type: 'string', enum: ['active', 'completed', 'failed'] } },
+    },
+    async execute({ status }) {
+      return { ok: true, goals: require('../goals/store').list(status) };
+    },
+  },
+
+  integration_search: {
+    name: 'integration_search',
+    description: 'Search bundled GitHub integration repos manifest',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+    async execute({ query }) {
+      return require('../knowledge/structures').repoIndex(query);
+    },
+  },
+
   web_fetch: {
     name: 'web_fetch',
     description: 'Fetch a public HTTP URL (read-only)',
@@ -330,7 +528,7 @@ async function executeTool(name, args, sessionId) {
   const tool = getTool(name);
   if (!tool) return { ok: false, error: `Unknown tool: ${name}` };
   try {
-    const result = await tool.execute(args || {});
+    const result = await tool.execute(args || {}, sessionId);
     memory.appendToolTrace(sessionId, name, args, JSON.stringify(result), result.ok !== false);
     return result;
   } catch (e) {

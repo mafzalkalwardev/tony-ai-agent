@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "disableBypassPermissionsMode": "disable",
+    "allowManagedPermissionRulesOnly": true,
+    "allowManagedMcpServersOnly": true,
+    "allowManagedHooksOnly": true
+  },
+  "approvedMcpServers": [
+    "perplexity",
+    "firecrawl",
+    "playwright",
+    "user-codegraph"
+  ],
+  "denyTools": [
+    "rm -rf",
+    "git push --force"
+  ],
+  "notes": "Template for enterprise Claude Code deployment. Adapt paths for your MDM distribution."
+}

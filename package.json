@@ -1,7 +1,7 @@
 {
   "name": "tony-agent",
-  "version": "2.0.0",
-  "description": "TONY — autonomous AI agent with Groq brain, voice lane, graphify, Obsidian brain, and Charlie OS",
+  "version": "2.1.0",
+  "description": "TONY — Groq brain, MCP integrations, goal-driven agent, graphify, Obsidian brain, Charlie OS",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
@@ -17,7 +17,9 @@
     "charlie:status": "node src/charlie-os/index.js status",
     "charlie:graph": "node src/charlie-os/index.js graph",
     "charlie:build": "node src/charlie-os/index.js build",
-    "graph": "node src/charlie-os/index.js graph"
+    "graph": "node src/charlie-os/index.js graph",
+    "integrations:init": "node scripts/init-integrations.js",
+    "integrations:status": "node scripts/init-integrations.js --status"
   },
   "engines": {
     "node": ">=20"

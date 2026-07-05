@@ -3,6 +3,7 @@ data-test/
 .env
 node_modules/
 .pytest_cache/
+integrations/repos/
 
 # Legacy experiments (keep locally, not in v1.0 repo)
 tony/

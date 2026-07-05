@@ -1,0 +1,105 @@
+{
+  "version": "1.0.0",
+  "description": "Curated Claude Code / agent ecosystem repos bundled with TONY",
+  "repos": [
+    {
+      "name": "superpowers",
+      "url": "https://github.com/obra/superpowers",
+      "clone": "obra/superpowers",
+      "description": "Agentic skills framework — brainstorming, TDD, executing-plans, subagent-driven-development",
+      "tags": ["skills", "tdd", "superpowers", "orchestration"]
+    },
+    {
+      "name": "awesome-claude-code",
+      "url": "https://github.com/hesreallyhim/awesome-claude-code",
+      "clone": "hesreallyhim/awesome-claude-code",
+      "description": "Curated collection of Claude Code skills, agents, plugins, and tooling",
+      "tags": ["awesome", "curated", "skills"]
+    },
+    {
+      "name": "claude-squad",
+      "url": "https://github.com/smtg-ai/claude-squad",
+      "clone": "smtg-ai/claude-squad",
+      "description": "Manage multiple AI terminal agents (Claude Code, Codex, OpenCode, Amp)",
+      "tags": ["multi-agent", "orchestration", "squad"]
+    },
+    {
+      "name": "karpathy-guidelines",
+      "url": "https://github.com/multica-ai/andrej-karpathy-skills",
+      "clone": "multica-ai/andrej-karpathy-skills",
+      "description": "Karpathy-inspired guidelines — think first, simplicity, surgical changes, goal-driven execution",
+      "tags": ["karpathy", "guidelines", "goals"]
+    },
+    {
+      "name": "claude-subconscious",
+      "url": "https://github.com/letta-ai/claude-subconscious",
+      "clone": "letta-ai/claude-subconscious",
+      "description": "Give Claude Code a subconscious — persistent background memory layer",
+      "tags": ["memory", "subconscious", "letta"]
+    },
+    {
+      "name": "playwright-mcp",
+      "url": "https://github.com/microsoft/playwright-mcp",
+      "clone": "microsoft/playwright-mcp",
+      "description": "Playwright MCP server for browser automation and testing",
+      "tags": ["playwright", "mcp", "browser", "testing"]
+    },
+    {
+      "name": "tdd-guardian",
+      "url": "https://github.com/xiaolai/tdd-guardian-for-claude",
+      "clone": "xiaolai/tdd-guardian-for-claude",
+      "description": "TDD Guard — enforces test-first development with coverage and mutation gates",
+      "tags": ["tdd", "testing", "quality-gates"]
+    },
+    {
+      "name": "wshobson-agents",
+      "url": "https://github.com/wshobson/agents",
+      "clone": "wshobson/agents",
+      "description": "88 plugins, 194 agents, 158 skills — production subagents marketplace",
+      "tags": ["plugins", "subagents", "production", "orchestration"],
+      "sparse": true
+    },
+    {
+      "name": "repomix",
+      "url": "https://github.com/yamadashy/repomix",
+      "clone": "yamadashy/repomix",
+      "description": "Pack entire repository into AI-friendly single file for LLM context",
+      "tags": ["repomix", "context", "packing"]
+    },
+    {
+      "name": "everything-claude-code",
+      "url": "https://github.com/affaan-m/ECC",
+      "clone": "affaan-m/ECC",
+      "description": "Everything Claude Code — agents, skills, hooks, commands, rules, MCPs from hackathon winner",
+      "tags": ["ecc", "everything", "skills", "hooks", "mcp"]
+    },
+    {
+      "name": "ponytail",
+      "url": "https://github.com/DietrichGebert/ponytail",
+      "clone": "DietrichGebert/ponytail",
+      "description": "Lazy senior dev skill — YAGNI ladder, minimum code that works",
+      "tags": ["ponytail", "yagni", "simplicity"]
+    },
+    {
+      "name": "impeccable",
+      "url": "https://github.com/pbakaus/impeccable",
+      "clone": "pbakaus/impeccable",
+      "description": "Design vocabulary for AI — audit, polish, critique, 45 detector rules",
+      "tags": ["design", "ui", "impeccable", "frontend"]
+    }
+  ],
+  "contextFiles": [
+    "context/CLAUDE.md",
+    "context/AGENTS.md",
+    "context/karpathy-guidelines.md",
+    "context/subconscious.md",
+    "context/enterprise-hardening.md"
+  ],
+  "mcpServers": [
+    "perplexity",
+    "firecrawl",
+    "quickbooks",
+    "higgsfield",
+    "playwright"
+  ]
+}

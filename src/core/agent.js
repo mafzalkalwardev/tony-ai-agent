@@ -6,10 +6,15 @@ const { listTools, executeTool } = require('../tools/registry');
 const { plan, synthesize } = require('./planner');
 const { loadSkillsContext } = require('../skills/loader');
 const { assembleContext, formatContextBlock } = require('../brain/architectures');
+const goalStore = require('../goals/store');
 
 function buildMessages(sessionId, userMessage, skillsContext) {
   const history = memory.getSessionHistory(sessionId, 20);
   const mindContext = formatContextBlock(assembleContext({ sessionId, userMessage }));
+  const activeGoals = goalStore.list('active').slice(0, 5);
+  const goalsBlock = activeGoals.length
+    ? activeGoals.map((g) => `- [${g.id}] ${g.title}: ${(g.successCriteria || []).join('; ')}`).join('\n')
+    : 'None';
   const system = `${loadIdentity()}
 
 ## Skills loaded
@@ -18,8 +23,12 @@ ${skillsContext || 'None'}
 ## Architectures of mind (retrieved context)
 ${mindContext || 'No additional memory/graph context retrieved.'}
 
+## Active goals
+${goalsBlock}
+
 ## Instructions
 Use tools when needed. After tool results, continue reasoning or give final answer.
+For incomplete goals, use goal_run to keep working until success criteria pass.
 When done, respond without requesting more tools.`;
 
   return [

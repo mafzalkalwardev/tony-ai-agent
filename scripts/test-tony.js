@@ -26,8 +26,28 @@ function assert(name, condition) {
 async function main() {
   console.log('=== TONY Agent Tests ===\n');
 
-  assert('tools registered', listTools().length >= 15);
-  assert('skills loaded', listSkills().length >= 4);
+  assert('tools registered', listTools().length >= 25);
+  assert('skills loaded', listSkills().length >= 8);
+
+  const mcp = require('../src/mcp');
+  const mcpStatus = mcp.statusAll();
+  assert('mcp layer', Object.keys(mcpStatus).length >= 5);
+
+  const goalStore = require('../src/goals/store');
+  const testGoal = goalStore.create({
+    title: 'Test goal',
+    description: 'Verify goal store',
+    successCriteria: ['response contains:done'],
+  });
+  assert('goal store', Boolean(testGoal.id));
+  goalStore.complete(testGoal.id, 'test done');
+
+  const manifest = require('../integrations/manifest.json');
+  assert('integrations manifest', manifest.repos.length >= 10);
+
+  const structures = require('../src/knowledge/structures');
+  const multi = await structures.queryAll('agent', { structures: ['graph', 'repo'] });
+  assert('knowledge structures', Boolean(multi.results));
 
   const graphify = require('../src/brain/graphify');
   const graph = graphify.buildFromWorkspace();
