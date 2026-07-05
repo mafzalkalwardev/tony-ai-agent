@@ -9,7 +9,7 @@ const { runAgent } = require('../core/agent');
 const memory = require('../memory');
 
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 function auth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -21,12 +21,14 @@ function auth(req, res, next) {
 }
 
 app.get('/health', (_req, res) => {
+  const architectures = require('../brain/architectures');
   res.json({
     ok: true,
     name: 'TONY',
-    version: '1.0.0',
+    version: '2.0.0',
     llm: config.llmProvider,
     skills: require('../skills/loader').listSkills().length,
+    mind: architectures.status(),
   });
 });
 
@@ -68,8 +70,78 @@ app.post('/api/crew', auth, async (req, res) => {
   }
 });
 
-app.get('/api/voice/status', auth, (_req, res) => {
-  res.json(require('../channels/voice').voiceStatus());
+app.get('/api/voice/status', auth, async (_req, res) => {
+  res.json(await require('../channels/voice').voiceStatus());
+});
+
+app.post('/api/voice/transcribe', auth, async (req, res) => {
+  try {
+    const { audioBase64, mimeType } = req.body || {};
+    if (!audioBase64) return res.status(400).json({ error: 'audioBase64 required' });
+    const result = await require('../channels/voice').transcribeAudio({ audioBase64, mimeType });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/voice/speak', auth, async (req, res) => {
+  try {
+    const { text, voiceId } = req.body || {};
+    if (!text) return res.status(400).json({ error: 'text required' });
+    const result = await require('../channels/voice').speakText(text, { voiceId });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/voice/converse', auth, async (req, res) => {
+  try {
+    const { audioBase64, mimeType, sessionId = randomUUID(), speak = true } = req.body || {};
+    if (!audioBase64) return res.status(400).json({ error: 'audioBase64 required' });
+    const result = await require('../channels/voice').voiceConverse({
+      sessionId,
+      audioBase64,
+      mimeType,
+      speak,
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/brain/status', auth, (_req, res) => {
+  res.json(require('../brain/architectures').status());
+});
+
+app.post('/api/brain/graph/build', auth, (_req, res) => {
+  const graphify = require('../brain/graphify');
+  const graph = graphify.buildFromWorkspace();
+  res.json({ ok: true, nodes: graph.nodes.length, edges: graph.edges.length, builtAt: graph.builtAt });
+});
+
+app.get('/api/brain/graph/query', auth, (req, res) => {
+  const graphify = require('../brain/graphify');
+  res.json(graphify.query(req.query.q || ''));
+});
+
+app.get('/api/brain/obsidian/search', auth, (req, res) => {
+  const obsidian = require('../brain/obsidian');
+  res.json(obsidian.searchNotes(req.query.q || ''));
+});
+
+app.post('/api/agents/paul/build', auth, async (req, res) => {
+  try {
+    const { task, constraints, sessionId = randomUUID() } = req.body || {};
+    if (!task) return res.status(400).json({ error: 'task required' });
+    const paul = require('../agents/paul');
+    const result = await paul.build(task, sessionId, { constraints });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 const server = http.createServer(app);
@@ -89,10 +161,24 @@ wss.on('connection', (ws, req) => {
   ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
-      if (msg.type !== 'chat' || !msg.message) return;
-      ws.send(JSON.stringify({ type: 'thinking' }));
-      const result = await runAgent({ sessionId, message: msg.message });
-      ws.send(JSON.stringify({ type: 'response', ...result }));
+      if (msg.type === 'chat' && msg.message) {
+        ws.send(JSON.stringify({ type: 'thinking' }));
+        const result = await runAgent({ sessionId, message: msg.message });
+        ws.send(JSON.stringify({ type: 'response', ...result }));
+        return;
+      }
+
+      if (msg.type === 'voice' && msg.audioBase64) {
+        ws.send(JSON.stringify({ type: 'thinking' }));
+        const voice = require('../channels/voice');
+        const result = await voice.voiceConverse({
+          sessionId,
+          audioBase64: msg.audioBase64,
+          mimeType: msg.mimeType,
+          speak: msg.speak !== false,
+        });
+        ws.send(JSON.stringify({ type: 'voice_response', ...result }));
+      }
     } catch (e) {
       ws.send(JSON.stringify({ type: 'error', error: e.message }));
     }

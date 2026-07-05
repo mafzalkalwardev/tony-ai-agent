@@ -5,13 +5,18 @@ const { complete, loadIdentity } = require('../llm');
 const { listTools, executeTool } = require('../tools/registry');
 const { plan, synthesize } = require('./planner');
 const { loadSkillsContext } = require('../skills/loader');
+const { assembleContext, formatContextBlock } = require('../brain/architectures');
 
 function buildMessages(sessionId, userMessage, skillsContext) {
   const history = memory.getSessionHistory(sessionId, 20);
+  const mindContext = formatContextBlock(assembleContext({ sessionId, userMessage }));
   const system = `${loadIdentity()}
 
 ## Skills loaded
 ${skillsContext || 'None'}
+
+## Architectures of mind (retrieved context)
+${mindContext || 'No additional memory/graph context retrieved.'}
 
 ## Instructions
 Use tools when needed. After tool results, continue reasoning or give final answer.

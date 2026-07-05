@@ -6,6 +6,7 @@ function createProvider() {
   const kind = config.llmProvider;
   if (kind === 'openai') return require('./openai');
   if (kind === 'anthropic') return require('./anthropic');
+  if (kind === 'groq') return require('./groq');
   return require('./mock');
 }
 

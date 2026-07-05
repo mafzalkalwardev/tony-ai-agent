@@ -13,17 +13,29 @@
 - [x] Mock/OpenAI/Anthropic LLM providers
 - [x] Docker compose
 
-## v1.1 (next)
+## v2.0 (shipped)
+
+- [x] Groq LLM brain (fast inference)
+- [x] Deepgram STT + ElevenLabs TTS voice lane
+- [x] graphify knowledge graph (workspace + wikilink edges)
+- [x] Obsidian agentic brain vault
+- [x] Architectures of Mind — 7-layer cognitive orchestration
+- [x] Paul builder agent + skill
+- [x] Charlie OS local runtime shell
+- [x] Voice WebSocket + REST endpoints
+- [x] GitHub CI workflow
+
+## v2.1 (next)
 
 - [ ] Telegram / Discord channels
-- [ ] Vector embeddings for semantic search (sqlite-vec or pgvector)
-- [ ] Scheduled Friday brief cron
-- [ ] Proactive watchers (inbox, CI, campaigns)
+- [ ] Vector embeddings for semantic search (sqlite-vec)
+- [ ] Streaming Groq + ElevenLabs responses
+- [ ] Obsidian sync with live vault watcher
 - [ ] MCP server mode for Cursor integration
 
-## v2.0 (vision)
+## v3.0 (vision)
 
-- [ ] Nova voice lane (streaming STT/TTS)
 - [ ] Persistent agent graph (LangGraph-style checkpoints)
 - [ ] Self-improving skill generation from successful traces
 - [ ] Multi-user tenancy with encrypted memory partitions
+- [ ] Charlie OS desktop tray / system service

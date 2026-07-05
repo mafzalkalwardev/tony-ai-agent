@@ -107,6 +107,76 @@ const builtins = {
     },
   },
 
+  graph_query: {
+    name: 'graph_query',
+    description: 'Query the graphify knowledge graph for concepts, files, and relationships',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+    async execute({ query }) {
+      const graphify = require('../brain/graphify');
+      return { ok: true, ...graphify.query(query) };
+    },
+  },
+
+  graph_build: {
+    name: 'graph_build',
+    description: 'Rebuild the graphify knowledge graph from workspace sources',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      const graphify = require('../brain/graphify');
+      const graph = graphify.buildFromWorkspace();
+      return { ok: true, nodes: graph.nodes.length, edges: graph.edges.length, builtAt: graph.builtAt };
+    },
+  },
+
+  obsidian_search: {
+    name: 'obsidian_search',
+    description: 'Search the Obsidian agentic brain vault',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+    async execute({ query }) {
+      const obsidian = require('../brain/obsidian');
+      return obsidian.searchNotes(query);
+    },
+  },
+
+  obsidian_read: {
+    name: 'obsidian_read',
+    description: 'Read a note from the Obsidian agentic brain vault',
+    parameters: {
+      type: 'object',
+      properties: { note: { type: 'string', description: 'Note path or title' } },
+      required: ['note'],
+    },
+    async execute({ note }) {
+      const obsidian = require('../brain/obsidian');
+      return obsidian.readNote(note);
+    },
+  },
+
+  paul_build: {
+    name: 'paul_build',
+    description: 'Dispatch Paul builder agent to ship an integration or code task',
+    parameters: {
+      type: 'object',
+      properties: {
+        task: { type: 'string' },
+        constraints: { type: 'string' },
+      },
+      required: ['task'],
+    },
+    async execute({ task, constraints }, sessionId) {
+      const paul = require('../agents/paul');
+      return paul.build(task, sessionId, { constraints });
+    },
+  },
+
   web_fetch: {
     name: 'web_fetch',
     description: 'Fetch a public HTTP URL (read-only)',

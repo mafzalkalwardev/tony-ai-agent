@@ -22,6 +22,10 @@ const ROLES = {
     name: 'Strategist',
     focus: 'Priorities, tradeoffs, Friday-style executive briefs.',
   },
+  paul: {
+    name: 'Paul (Builder)',
+    focus: 'Ship integrations locally, wire voice/graph/brain layers, minimal focused diffs.',
+  },
 };
 
 async function runSpecialist(role, task, context = '') {
@@ -50,6 +54,7 @@ function selectRoles(task) {
   if (/research|learn|find|github|pattern/.test(t)) roles.push('researcher');
   if (/sms|campaign|signalmint|compliance|inbox/.test(t)) roles.push('operator');
   if (/priority|brief|plan|strategy|focus|week/.test(t)) roles.push('strategist');
+  if (/build|ship|integrate|wire|deploy|docker|github|voice|graph/.test(t)) roles.push('paul');
   if (!roles.length) roles.push('strategist', 'researcher');
   return [...new Set(roles)];
 }

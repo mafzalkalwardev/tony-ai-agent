@@ -26,8 +26,23 @@ function assert(name, condition) {
 async function main() {
   console.log('=== TONY Agent Tests ===\n');
 
-  assert('tools registered', listTools().length >= 10);
-  assert('skills loaded', listSkills().length >= 3);
+  assert('tools registered', listTools().length >= 15);
+  assert('skills loaded', listSkills().length >= 4);
+
+  const graphify = require('../src/brain/graphify');
+  const graph = graphify.buildFromWorkspace();
+  assert('graphify builds', graph.nodes.length >= 5);
+
+  const obsidian = require('../src/brain/obsidian');
+  const obsSearch = obsidian.searchNotes('memory');
+  assert('obsidian brain', obsSearch.ok && obsSearch.hits.length >= 1);
+
+  const architectures = require('../src/brain/architectures');
+  const mind = architectures.status();
+  assert('architectures of mind', mind.layers.length === 7);
+
+  const paul = require('../src/agents/paul');
+  assert('paul builder', paul.status().name === 'Paul');
 
   memory.remember('User prefers autonomous overnight builds', ['test']);
   const search = memory.searchAll('autonomous');
