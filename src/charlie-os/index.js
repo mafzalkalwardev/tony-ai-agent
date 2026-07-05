@@ -8,13 +8,13 @@ const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '../..');
 process.chdir(root);
 
-const config = require('../src/config');
-const architectures = require('../src/brain/architectures');
-const graphify = require('../src/brain/graphify');
-const paul = require('../src/agents/paul');
+const config = require('../config');
+const architectures = require('../brain/architectures');
+const graphify = require('../brain/graphify');
+const paul = require('../agents/paul');
 
 const args = process.argv.slice(2);
 const command = args[0] || 'boot';
@@ -65,7 +65,7 @@ async function waitForHealth(timeoutMs = 15000) {
 }
 
 function bootGateway() {
-  return spawn(process.execPath, ['src/gateway/server.js'], {
+  return spawn(process.execPath, [path.join(root, 'src/gateway/server.js')], {
     cwd: root,
     stdio: 'inherit',
     env: process.env,
@@ -78,8 +78,8 @@ async function boot() {
   const graph = graphify.buildFromWorkspace();
   console.log(`[Charlie OS] Graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges`);
 
-  if (require('../src/brain/obsidian').isConfigured()) {
-    require('../src/brain/obsidian').getAgenticBrainIndex();
+  if (require('../brain/obsidian').isConfigured()) {
+    require('../brain/obsidian').getAgenticBrainIndex();
     console.log('[Charlie OS] Obsidian agentic brain vault ready');
   }
 
