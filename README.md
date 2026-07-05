@@ -1,6 +1,8 @@
-# TONY AI Agent
+# TONY — Unified Personal AI (One Project)
 
-**TONY** (Tactical Omniscient Neural Yielder) is a self-hosted autonomous AI agent combining the strongest patterns from modern open-source agent systems — now with **Groq brain**, **Deepgram + ElevenLabs voice**, **graphify knowledge graph**, **Obsidian agentic brain**, **Paul builder**, and **Charlie OS** local runtime.
+**This is the one TONY.** Voice, workflows, goals, MCP, CodeGraph, web UI, and your original [tony-ai](https://github.com/mafzalkalwardev/tony-ai) desktop assistant — all in this repo.
+
+**TONY** (Tactical Omniscient Neural Yielder) is a self-hosted autonomous AI for your laptop: **Groq brain**, **Deepgram + ElevenLabs voice**, **automated workflows**, **graphify**, **Obsidian brain**, **Paul builder**, and **Charlie OS** runtime.
 
 | Source | Pattern adopted |
 |--------|-----------------|
@@ -37,7 +39,25 @@ npm run chat         # Interactive CLI
 | MCP | Perplexity, Firecrawl, QuickBooks, Higgsfield, Playwright | See `.env.example` |
 | Goals | Loop until success criteria met | `goal_run` tool, `POST /api/goals/run` |
 
-## v2.1 — MCP + Goals + Integrations
+### Playwright MCP (free, local — no API key)
+
+Per [Playwright MCP docs](https://playwright.dev/docs/getting-started-mcp):
+
+```powershell
+npm run playwright:mcp    # Terminal 1 — starts @playwright/mcp on :8931
+npm run test:live           # Terminal 2 — full live test
+```
+
+Set `PLAYWRIGHT_MCP_URL=http://localhost:8931/mcp` (default). Uses JSON-RPC over HTTP per [microsoft/playwright-mcp](https://github.com/microsoft/playwright-mcp).
+
+### Local-first mode (`TONY_LOCAL_FIRST=true`)
+
+When Perplexity/QuickBooks/Higgsfield keys are missing, TONY falls back to:
+- **graphify** + integration repos + Obsidian (free)
+- **Firecrawl** or **fetch** for web content
+- **Playwright MCP** for browser (free local)
+- **Groq → OpenAI** LLM fallback on rate limits
+
 
 ```powershell
 npm run integrations:init    # Clone 12 GitHub repos locally
@@ -52,7 +72,23 @@ npm run integrations:status
 
 **Context:** `context/CLAUDE.md`, `context/AGENTS.md`, karpathy guidelines, subconscious, enterprise hardening
 
-**Bundled repos:** superpowers, awesome-claude-code, claude-squad, karpathy-guidelines, claude-subconscious, playwright-mcp, tdd-guardian, wshobson-agents, repomix, everything-claude-code, ponytail, impeccable
+**Bundled repos:** superpowers, awesome-claude-code, claude-squad, karpathy-guidelines, claude-subconscious, playwright-mcp, tdd-guardian, wshobson-agents, repomix, everything-claude-code, ponytail, impeccable, **tony-ai** (original desktop assistant)
+
+### tony-ai integration (original project)
+
+Your first repo [tony-ai](https://github.com/mafzalkalwardev/tony-ai) is now bundled:
+
+```powershell
+npm run integrations:init          # clones tony-ai + 16 other repos
+npm run codegraph:index            # index codebase for agent code intelligence
+```
+
+- **Web TONY** (this repo): Groq brain, Deepgram/ElevenLabs voice bar, workflows, MCP, goals
+- **Desktop tony-ai**: `python run_tony.py` in `integrations/repos/tony-ai` — free local voice, PyQt6 UI
+- **Bridge tools**: `tony_desktop_status`, `tony_desktop_command`, `workflow_run`, `codegraph_*`
+
+See `context/tony-ai-integration.md` and `skills/tony-desktop/SKILL.md`.
+
 
 
 ```bash

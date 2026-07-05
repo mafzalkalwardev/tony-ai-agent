@@ -1,11 +1,12 @@
 {
   "name": "tony-agent",
-  "version": "2.1.0",
+  "version": "2.4.0",
   "description": "TONY — Groq brain, MCP integrations, goal-driven agent, graphify, Obsidian brain, Charlie OS",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node src/gateway/server.js",
+    "ui": "node src/gateway/server.js",
     "cli": "node src/cli.js",
     "chat": "node src/cli.js chat",
     "run": "node src/cli.js run",
@@ -19,7 +20,11 @@
     "charlie:build": "node src/charlie-os/index.js build",
     "graph": "node src/charlie-os/index.js graph",
     "integrations:init": "node scripts/init-integrations.js",
-    "integrations:status": "node scripts/init-integrations.js --status"
+    "integrations:status": "node scripts/init-integrations.js --status",
+    "playwright:mcp": "node scripts/playwright-mcp.js",
+    "test:live": "node scripts/test-live.js",
+    "codegraph:sync": "codegraph sync",
+    "codegraph:index": "codegraph index"
   },
   "engines": {
     "node": ">=20"

@@ -26,7 +26,43 @@ function assert(name, condition) {
 async function main() {
   console.log('=== TONY Agent Tests ===\n');
 
-  assert('tools registered', listTools().length >= 25);
+  assert('tools registered', listTools().length >= 38);
+
+  const { classifyCommand, canRunCommand } = require('../src/safety/policy');
+  assert('safety blocks rm -rf', classifyCommand('rm -rf /').level === 'BLOCKED');
+  assert('safety allows git status', canRunCommand('git status').allowed === true);
+
+  const codegraph = require('../src/brain/codegraph');
+  const cgStatus = codegraph.status();
+  assert('codegraph module', typeof cgStatus.configured === 'boolean');
+
+  const tonyDesktop = require('../src/bridge/tony-desktop');
+  assert('tony-desktop bridge', typeof tonyDesktop.status === 'function');
+
+  const { pickMode } = require('../src/workflows/runner');
+  assert('workflow picks goal', pickMode('build website until tests pass') === 'goal');
+  assert('workflow picks crew', pickMode('research and compare multi-agent') === 'crew');
+
+  const { runCrew } = require('../src/core/crew');
+  assert('crew module', typeof runCrew === 'function');
+
+  const taskStore = require('../src/tasks/store');
+  const t = taskStore.create({
+    name: 'test-offline-task',
+    triggers: ['repeat test-offline-task'],
+    steps: [{ tool: 'memory_search', args: { query: 'test' } }],
+  });
+  assert('task store', Boolean(t.id));
+  const { replayTask } = require('../src/tasks/replay');
+  const replay = await replayTask(t, randomUUID());
+  assert('task replay', replay.mode === 'task-replay');
+
+  const { runLocalAgent } = require('../src/local/agent');
+  const local = await runLocalAgent({ sessionId: randomUUID(), message: 'list tasks' });
+  assert('local agent', local.offline === true);
+
+  const gemini = require('../src/llm/gemini');
+  assert('gemini provider', typeof gemini.complete === 'function');
   assert('skills loaded', listSkills().length >= 8);
 
   const mcp = require('../src/mcp');
@@ -43,7 +79,7 @@ async function main() {
   goalStore.complete(testGoal.id, 'test done');
 
   const manifest = require('../integrations/manifest.json');
-  assert('integrations manifest', manifest.repos.length >= 10);
+  assert('integrations manifest', manifest.repos.length >= 15);
 
   const structures = require('../src/knowledge/structures');
   const multi = await structures.queryAll('agent', { structures: ['graph', 'repo'] });

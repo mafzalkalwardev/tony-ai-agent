@@ -12,7 +12,7 @@ const argText = rest.join(' ').trim();
 
 async function chatInteractive() {
   const sessionId = randomUUID();
-  console.log('TONY v1.0 — type "exit" to quit\n');
+  console.log('TONY v2.3 — type "exit" to quit\n');
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = () => {

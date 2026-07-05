@@ -4,8 +4,11 @@ data-test/
 node_modules/
 .pytest_cache/
 integrations/repos/
+.playwright-mcp/
+.codegraph/
 
-# Legacy experiments (keep locally, not in v1.0 repo)
+# IDE / local tooling
+.cursor/
 tony/
 tony-ai/
 *.db

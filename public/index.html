@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TONY — Tactical Omniscient Neural Yielder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">T</div>
+        <div>
+          <h1>TONY</h1>
+          <p>Tactical Omniscient Neural Yielder</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="chat">💬 Chat</button>
+        <button class="nav-item" data-view="tasks">🔁 Tasks</button>
+        <button class="nav-item" data-view="workflows">⚡ Workflows</button>
+        <button class="nav-item" data-view="goals">🎯 Goals</button>
+        <button class="nav-item" data-view="brain">🧠 Brain</button>
+        <button class="nav-item" data-view="integrations">🔌 Integrations</button>
+        <button class="nav-item" data-view="presentation">📊 Presentation</button>
+      </nav>
+      <div class="status-panel" id="statusPanel">
+        <h3>System Status</h3>
+        <div id="statusList">Loading…</div>
+      </div>
+      <div class="sidebar-foot">
+        <a href="https://github.com/mafzalkalwardev/tony-ai" target="_blank" rel="noopener">tony-ai</a>
+        ·
+        <a href="https://github.com/mafzalkalwardev/tony-ai-agent" target="_blank" rel="noopener">agent</a>
+        <span id="versionTag">v2.1</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- CHAT -->
+      <section class="view active" id="view-chat">
+        <header class="view-header">
+          <div>
+            <h2>Command Center</h2>
+            <p>Groq · Gemini · Ollama offline · Deepgram · ElevenLabs</p>
+          </div>
+          <div class="lang-pills" id="langPills">
+            <button class="pill active" data-lang="auto">Auto</button>
+            <button class="pill" data-lang="en">English</button>
+            <button class="pill" data-lang="ur">اردو</button>
+            <button class="pill" data-lang="hi">हिन्दी</button>
+            <button class="pill" data-lang="roman">Roman Urdu</button>
+          </div>
+        </header>
+
+        <!-- Voice control bar -->
+        <div class="voice-bar" id="voiceBar" data-state="ready">
+          <button type="button" class="voice-btn mic-btn" id="micBtn" title="Click to speak · Hold Space">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+            <span class="voice-pulse"></span>
+          </button>
+          <div class="voice-info">
+            <strong>Talk to TONY</strong>
+            <span id="voiceStatus">Voice ready</span>
+          </div>
+          <button type="button" class="voice-btn speaker-btn active" id="speakerBtn" title="Toggle voice output">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          </button>
+          <div class="voice-hint">Click mic · Hold <kbd>Space</kbd> push-to-talk</div>
+        </div>
+
+        <div class="messages" id="messages"></div>
+        <form class="composer" id="chatForm">
+          <textarea id="chatInput" rows="1" placeholder="Type or use the mic above… Urdu, Hindi, English" autofocus></textarea>
+          <button type="button" class="btn-voice-mini" id="micBtnMini" title="Speak">🎤</button>
+          <button type="submit" class="btn-send" id="sendBtn">Send</button>
+        </form>
+      </section>
+
+      <!-- TASKS -->
+      <section class="view" id="view-tasks">
+        <header class="view-header">
+          <h2>Task Recorder</h2>
+          <p>Record workflows online · replay offline with "repeat &lt;name&gt;"</p>
+          <span class="offline-badge" id="offlineBadge">Checking…</span>
+        </header>
+        <div class="card-list" id="tasksList"></div>
+      </section>
+
+      <!-- WORKFLOWS -->
+      <section class="view" id="view-workflows">
+        <header class="view-header">
+          <h2>Automated Workflows</h2>
+          <p>Voice or type a task — TONY auto-picks agent, goal loop, or crew mode</p>
+        </header>
+        <form class="goal-form" id="workflowForm">
+          <textarea id="workflowTask" placeholder="e.g. Build a landing page, run tests, and prepare git commit" rows="3" required></textarea>
+          <select id="workflowMode">
+            <option value="auto">Auto (recommended)</option>
+            <option value="agent">Single agent</option>
+            <option value="goal">Goal loop</option>
+            <option value="crew">Multi-agent crew</option>
+          </select>
+          <label class="checkbox-row"><input type="checkbox" id="workflowSpeak" checked /> Speak result (ElevenLabs)</label>
+          <button type="submit" class="btn-primary">Run Workflow</button>
+        </form>
+        <div class="card-list" id="workflowsList"></div>
+      </section>
+
+      <!-- GOALS -->
+      <section class="view" id="view-goals">
+        <header class="view-header">
+          <h2>Goal Loop Engineering</h2>
+          <p>Loop until success criteria pass — Karpathy principle #4</p>
+        </header>
+        <form class="goal-form" id="goalForm">
+          <input type="text" id="goalTitle" placeholder="Goal title" required />
+          <textarea id="goalDesc" placeholder="Description" rows="2"></textarea>
+          <input type="text" id="goalCriteria" placeholder="Success criteria (comma-separated, e.g. test:npm test)" />
+          <button type="submit" class="btn-primary">Run Goal Loop</button>
+        </form>
+        <div class="card-list" id="goalsList"></div>
+      </section>
+
+      <!-- BRAIN -->
+      <section class="view" id="view-brain">
+        <header class="view-header">
+          <h2>Architectures of Mind</h2>
+          <p>7-layer cognitive stack + knowledge graph</p>
+        </header>
+        <div class="brain-grid" id="brainGrid"></div>
+        <button class="btn-secondary" id="rebuildGraph">Rebuild Graphify</button>
+      </section>
+
+      <!-- INTEGRATIONS -->
+      <section class="view" id="view-integrations">
+        <header class="view-header">
+          <h2>Integrations & Free LLM APIs</h2>
+          <p>caveman · loop-engineering · collab-public · free-llm-api-resources</p>
+        </header>
+        <div class="card-list" id="integrationsList"></div>
+        <div class="card-list" id="freeLlmList"></div>
+      </section>
+
+      <!-- PRESENTATION -->
+      <section class="view" id="view-presentation">
+        <header class="view-header">
+          <h2>TONY Presentation</h2>
+          <p>Your personal laptop AI assistant — multilingual, local-first</p>
+        </header>
+        <div class="presentation" id="presentation">
+          <div class="slide active">
+            <span class="slide-num">01</span>
+            <h3>What is TONY?</h3>
+            <p>A self-hosted AI operating system for your laptop. Plans, executes, remembers, speaks — in Urdu, Hindi, Roman Urdu, and English.</p>
+          </div>
+          <div class="slide">
+            <span class="slide-num">02</span>
+            <h3>Brain & Voice</h3>
+            <ul>
+              <li><strong>Groq</strong> — fast LLM inference (free tier)</li>
+              <li><strong>Deepgram</strong> — speech-to-text</li>
+              <li><strong>ElevenLabs</strong> — natural voice output</li>
+            </ul>
+          </div>
+          <div class="slide">
+            <span class="slide-num">03</span>
+            <h3>Memory & Graph</h3>
+            <ul>
+              <li><strong>Graphify</strong> — code + concept knowledge graph</li>
+              <li><strong>Obsidian</strong> — agentic brain vault</li>
+              <li><strong>Episodic / Semantic / Procedural</strong> — SQLite + JSON</li>
+            </ul>
+          </div>
+          <div class="slide">
+            <span class="slide-num">04</span>
+            <h3>MCP & Research</h3>
+            <ul>
+              <li>Firecrawl, Playwright MCP (free local)</li>
+              <li>Loop engineering — goals until done</li>
+              <li>Caveman mode — fewer tokens, direct answers</li>
+            </ul>
+          </div>
+          <div class="slide">
+            <span class="slide-num">05</span>
+            <h3>Run Locally</h3>
+            <pre><code>npm run charlie      # Boot gateway
+npm run chat         # CLI
+Open http://localhost:8787  # This UI</code></pre>
+          </div>
+        </div>
+        <div class="slide-controls">
+          <button id="prevSlide">← Prev</button>
+          <span id="slideIndicator">1 / 5</span>
+          <button id="nextSlide">Next →</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Token modal -->
+  <dialog id="tokenDialog">
+    <form method="dialog">
+      <h3>Connect to TONY Gateway</h3>
+      <p>Enter your <code>TONY_API_TOKEN</code> from .env</p>
+      <input type="password" id="tokenInput" placeholder="API token" />
+      <div class="dialog-actions">
+        <button type="submit" class="btn-primary">Connect</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/js/voice.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

@@ -3,6 +3,8 @@ const firecrawl = require('./firecrawl');
 const quickbooks = require('./quickbooks');
 const higgsfield = require('./higgsfield');
 const playwright = require('./playwright');
+const graphify = require('../brain/graphify');
+const structures = require('../knowledge/structures');
 
 const providers = {
   perplexity,
@@ -14,6 +16,29 @@ const providers = {
 
 function statusAll() {
   return Object.fromEntries(Object.entries(providers).map(([name, mod]) => [name, mod.status()]));
+}
+
+/** Local-first research — no paid API required */
+async function localResearch(query) {
+  graphify.buildFromWorkspace();
+  const multi = await structures.queryAll(query, {
+    structures: ['graph', 'vault', 'repo', 'tree'],
+  });
+
+  const sources = [{ type: 'local', structures: multi }];
+
+  if (firecrawl.status().configured) {
+    const f = await firecrawl.search(query);
+    if (f.ok) sources.push({ type: 'firecrawl', ...f });
+  }
+
+  return {
+    ok: true,
+    query,
+    mode: 'local-first',
+    sources,
+    summary: structures.formatForAgent(multi),
+  };
 }
 
 async function research(query, options = {}) {
@@ -29,17 +54,18 @@ async function research(query, options = {}) {
     if (f.ok) results.sources.push({ type: 'firecrawl', ...f });
   }
 
-  if (!results.sources.length) {
-    return { ok: false, error: 'No MCP research providers configured', query };
+  if (results.sources.length) {
+    return { ok: true, mode: 'api', ...results };
   }
 
-  return { ok: true, ...results };
+  return localResearch(query);
 }
 
 module.exports = {
   providers,
   statusAll,
   research,
+  localResearch,
   perplexity,
   firecrawl,
   quickbooks,

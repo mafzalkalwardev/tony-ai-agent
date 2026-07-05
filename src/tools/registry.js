@@ -375,6 +375,102 @@ const builtins = {
     },
   },
 
+  free_llm_providers: {
+    name: 'free_llm_providers',
+    description: 'List free LLM/API providers from cheahjs/free-llm-api-resources index',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      const index = require('../knowledge/free-llm-index.json');
+      return { ok: true, providers: index.providers, source: index.source };
+    },
+  },
+
+  task_list: {
+    name: 'task_list',
+    description: 'List recorded tasks that can be replayed offline',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      return { ok: true, tasks: require('../tasks/store').list() };
+    },
+  },
+
+  task_record: {
+    name: 'task_record',
+    description: 'Manually record a named task with tool steps for offline replay',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        triggers: { type: 'array', items: { type: 'string' } },
+        steps: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              tool: { type: 'string' },
+              args: { type: 'object' },
+            },
+          },
+        },
+      },
+      required: ['name', 'steps'],
+    },
+    async execute({ name, triggers, steps }) {
+      const task = require('../tasks/store').create({ name, triggers, steps });
+      return { ok: true, task };
+    },
+  },
+
+  task_replay: {
+    name: 'task_replay',
+    description: 'Replay a recorded task by id or name (works offline)',
+    parameters: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string' },
+        name: { type: 'string' },
+      },
+    },
+    async execute({ task_id, name }, sessionId) {
+      const store = require('../tasks/store');
+      const task = store.get(task_id || name);
+      if (!task) return { ok: false, error: 'Task not found' };
+      return require('../tasks/replay').replayTask(task, sessionId);
+    },
+  },
+
+  task_delete: {
+    name: 'task_delete',
+    description: 'Delete a recorded task',
+    parameters: {
+      type: 'object',
+      properties: { task_id: { type: 'string' } },
+      required: ['task_id'],
+    },
+    async execute({ task_id }) {
+      require('../tasks/store').remove(task_id);
+      return { ok: true, deleted: task_id };
+    },
+  },
+
+  local_status: {
+    name: 'local_status',
+    description: 'Check offline mode, connectivity, and local agent capabilities',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      const { isOnline, status } = require('../local/connectivity');
+      const online = await isOnline(true);
+      return {
+        ok: true,
+        online,
+        connectivity: status(),
+        ollama: require('../llm/ollama').isAvailable(),
+        tasks: require('../tasks/store').list().length,
+        llm: require('../llm').providerStatus(),
+      };
+    },
+  },
+
   web_fetch: {
     name: 'web_fetch',
     description: 'Fetch a public HTTP URL (read-only)',
@@ -393,24 +489,167 @@ const builtins = {
 
   shell: {
     name: 'shell',
-    description: 'Run a safe read-only shell command in workspace (ls, git status, npm test)',
+    description:
+      'Run shell command in workspace. SAFE: git status, npm test. NEEDS_APPROVAL: git push/commit, npm install. BLOCKED: secrets, rm -rf.',
     parameters: {
       type: 'object',
-      properties: { command: { type: 'string' } },
+      properties: {
+        command: { type: 'string' },
+        approved: { type: 'boolean', description: 'Set true only after user explicitly approved risky command' },
+      },
       required: ['command'],
     },
-    async execute({ command }) {
-      const allowed = /^(git status|git log|git diff|npm test|npm run test|ls|dir|node scripts\/)/i;
-      if (!allowed.test(command.trim())) {
-        return { ok: false, error: 'Command not in allowlist. Use read_file or ask user to run manually.' };
+    async execute({ command, approved = false }) {
+      const { canRunCommand } = require('../safety/policy');
+      const check = canRunCommand(command, { approved, unsafeMode: config.shellUnsafe });
+      if (!check.allowed) {
+        return {
+          ok: false,
+          level: check.level,
+          error: check.reason,
+          hint: check.level === 'NEEDS_APPROVAL' ? 'Ask user to approve, then retry with approved:true' : undefined,
+        };
       }
       const out = execSync(command, {
         cwd: config.workspaceRoot,
         encoding: 'utf8',
-        timeout: 60000,
+        timeout: 120000,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-      return { ok: true, output: out.slice(0, 8000) };
+      return { ok: true, level: check.level, output: out.slice(0, 8000) };
+    },
+  },
+
+  write_file: {
+    name: 'write_file',
+    description: 'Write or update a text file in the workspace (for code/build tasks)',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        content: { type: 'string' },
+        approved: { type: 'boolean' },
+      },
+      required: ['path', 'content'],
+    },
+    async execute({ path: filePath, content, approved = false }) {
+      if (/\.env$/i.test(filePath) && !approved) {
+        return { ok: false, error: 'Writing .env requires approved:true after user consent' };
+      }
+      const full = safePath(filePath);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content, 'utf8');
+      return { ok: true, path: filePath, bytes: Buffer.byteLength(content, 'utf8') };
+    },
+  },
+
+  crew_run: {
+    name: 'crew_run',
+    description: 'Multi-agent crew (researcher, engineer, operator, strategist, Paul) for complex tasks',
+    parameters: {
+      type: 'object',
+      properties: { task: { type: 'string' }, context: { type: 'string' } },
+      required: ['task'],
+    },
+    async execute({ task, context = '' }) {
+      const { runCrew } = require('../core/crew');
+      const result = await runCrew(task, context);
+      return { ok: true, synthesis: result.synthesis, specialists: result.specialists.map((s) => s.name) };
+    },
+  },
+
+  workflow_run: {
+    name: 'workflow_run',
+    description:
+      'Run automated workflow: auto-picks agent/goal/crew mode. Use for "build website", "push to github", complex voice tasks.',
+    parameters: {
+      type: 'object',
+      properties: {
+        task: { type: 'string' },
+        mode: { type: 'string', enum: ['auto', 'agent', 'goal', 'crew', 'task'] },
+        speak: { type: 'boolean' },
+        success_criteria: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['task'],
+    },
+    async execute({ task, mode, speak, success_criteria }, sessionId) {
+      const { runWorkflow } = require('../workflows/runner');
+      return runWorkflow({
+        task,
+        sessionId,
+        mode: mode || 'auto',
+        speak: Boolean(speak),
+        successCriteria: success_criteria,
+      });
+    },
+  },
+
+  codegraph_status: {
+    name: 'codegraph_status',
+    description: 'Check CodeGraph index status (files, nodes, edges)',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      return { ok: true, ...require('../brain/codegraph').status() };
+    },
+  },
+
+  codegraph_search: {
+    name: 'codegraph_search',
+    description: 'Search codebase symbols via CodeGraph knowledge graph',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' }, limit: { type: 'number' } },
+      required: ['query'],
+    },
+    async execute({ query, limit }) {
+      const result = require('../brain/codegraph').search(query, limit || 10);
+      return { ok: result.ok, output: result.output || result.error };
+    },
+  },
+
+  codegraph_context: {
+    name: 'codegraph_context',
+    description: 'Get CodeGraph context for a task (entry points, callers, code snippets)',
+    parameters: {
+      type: 'object',
+      properties: { task: { type: 'string' } },
+      required: ['task'],
+    },
+    async execute({ task }) {
+      const result = require('../brain/codegraph').context(task);
+      return { ok: result.ok, output: result.output || result.error };
+    },
+  },
+
+  codegraph_sync: {
+    name: 'codegraph_sync',
+    description: 'Re-sync CodeGraph index after code changes',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      const result = require('../brain/codegraph').syncIndex();
+      return { ok: result.ok, output: result.output || result.error };
+    },
+  },
+
+  tony_desktop_status: {
+    name: 'tony_desktop_status',
+    description: 'Status of original tony-ai Python desktop assistant integration',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      return { ok: true, ...require('../bridge/tony-desktop').status() };
+    },
+  },
+
+  tony_desktop_command: {
+    name: 'tony_desktop_command',
+    description: 'Run a command via tony-ai AssistantBrain (local Python, free STT/TTS desktop)',
+    parameters: {
+      type: 'object',
+      properties: { text: { type: 'string' } },
+      required: ['text'],
+    },
+    async execute({ text }) {
+      return require('../bridge/tony-desktop').runTextCommand(text);
     },
   },
 };

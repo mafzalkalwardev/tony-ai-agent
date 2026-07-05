@@ -1,5 +1,6 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
+const path = require('path');
 const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
@@ -11,6 +12,9 @@ const memory = require('../memory');
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
+const publicDir = path.join(__dirname, '../../public');
+app.use(express.static(publicDir));
+
 function auth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.replace(/^Bearer\s+/i, '') || req.query.token;
@@ -20,20 +24,29 @@ function auth(req, res, next) {
   next();
 }
 
-app.get('/health', (_req, res) => {
+app.get('/health', async (_req, res) => {
   const architectures = require('../brain/architectures');
   const mcp = require('../mcp');
   const goalStore = require('../goals/store');
+  const taskStore = require('../tasks/store');
+  const { isOnline, status: connStatus } = require('../local/connectivity');
+  const online = await isOnline();
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.1.0',
+    version: '2.4.0',
     llm: config.llmProvider,
+    llmChain: require('../llm').providerStatus(),
+    online,
+    connectivity: connStatus(),
     skills: require('../skills/loader').listSkills().length,
     tools: require('../tools/registry').listTools().length,
     mind: architectures.status(),
     mcp: mcp.statusAll(),
     goals: { active: goalStore.list('active').length, completed: goalStore.list('completed').length },
+    tasks: { recorded: taskStore.list().length },
+    codegraph: require('../brain/codegraph').status(),
+    tonyDesktop: require('../bridge/tony-desktop').status(),
   });
 });
 
@@ -221,8 +234,74 @@ app.post('/api/goals/run', auth, async (req, res) => {
   }
 });
 
+app.post('/api/workflows/run', auth, async (req, res) => {
+  try {
+    const { task, mode, speak, successCriteria, sessionId = randomUUID() } = req.body || {};
+    if (!task) return res.status(400).json({ error: 'task required' });
+    const { runWorkflow } = require('../workflows/runner');
+    res.json(await runWorkflow({ task, sessionId, mode, speak, successCriteria }));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/codegraph/status', auth, (_req, res) => {
+  res.json(require('../brain/codegraph').status());
+});
+
+app.get('/api/tony-desktop/status', auth, (_req, res) => {
+  res.json(require('../bridge/tony-desktop').status());
+});
+
 app.get('/api/integrations/manifest', auth, (_req, res) => {
   res.json(require('../../integrations/manifest.json'));
+});
+
+app.get('/api/free-llm', auth, (_req, res) => {
+  res.json(require('../knowledge/free-llm-index.json'));
+});
+
+app.get('/api/tasks', auth, (_req, res) => {
+  res.json({ tasks: require('../tasks/store').list() });
+});
+
+app.post('/api/tasks', auth, (req, res) => {
+  const { name, description, triggers, steps } = req.body || {};
+  if (!name || !steps?.length) return res.status(400).json({ error: 'name and steps required' });
+  const task = require('../tasks/store').create({ name, description, triggers, steps });
+  res.json({ ok: true, task });
+});
+
+app.post('/api/tasks/replay', auth, async (req, res) => {
+  try {
+    const { taskId, name, sessionId = randomUUID() } = req.body || {};
+    const store = require('../tasks/store');
+    const task = store.get(taskId || name);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    res.json(await require('../tasks/replay').replayTask(task, sessionId));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/tasks/:id', auth, (req, res) => {
+  require('../tasks/store').remove(req.params.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/local/status', auth, async (_req, res) => {
+  const { isOnline, status } = require('../local/connectivity');
+  res.json({
+    online: await isOnline(true),
+    connectivity: status(),
+    ollama: await require('../llm/ollama').isAvailable(),
+    tasks: require('../tasks/store').list().length,
+    llm: require('../llm').providerStatus(),
+  });
+});
+
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 const server = http.createServer(app);

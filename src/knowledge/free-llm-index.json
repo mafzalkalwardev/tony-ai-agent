@@ -1,0 +1,72 @@
+{
+  "version": "1.1.0",
+  "updated": "2026-07-05",
+  "source": "https://github.com/cheahjs/free-llm-api-resources",
+  "providers": [
+    {
+      "name": "Groq",
+      "env": "GROQ_API_KEY",
+      "url": "https://console.groq.com",
+      "freeTier": "Generous free tier, fast inference",
+      "models": ["llama-3.3-70b-versatile", "mixtral-8x7b"],
+      "tonyDefault": true
+    },
+    {
+      "name": "OpenAI",
+      "env": "OPENAI_API_KEY",
+      "url": "https://platform.openai.com",
+      "freeTier": "Limited free credits for new accounts",
+      "models": ["gpt-4o-mini", "gpt-4o"]
+    },
+    {
+      "name": "Google AI Studio",
+      "env": "GOOGLE_AI_API_KEY",
+      "url": "https://aistudio.google.com",
+      "freeTier": "Free Gemini API tier",
+      "models": ["gemini-2.0-flash", "gemini-1.5-pro"]
+    },
+    {
+      "name": "OpenRouter",
+      "env": "OPENROUTER_API_KEY",
+      "url": "https://openrouter.ai",
+      "freeTier": "Free models available",
+      "models": ["meta-llama/llama-3.3-70b-instruct:free"]
+    },
+    {
+      "name": "Hugging Face",
+      "env": "HF_TOKEN",
+      "url": "https://huggingface.co/inference-api",
+      "freeTier": "Free inference API with rate limits",
+      "models": ["mistral", "llama", "whisper"]
+    },
+    {
+      "name": "Deepgram",
+      "env": "DEEPGRAM_API_KEY",
+      "url": "https://console.deepgram.com",
+      "freeTier": "$200 free credits",
+      "use": "Speech-to-text (TONY voice STT)"
+    },
+    {
+      "name": "ElevenLabs",
+      "env": "ELEVENLABS_API_KEY",
+      "url": "https://elevenlabs.io",
+      "freeTier": "Free tier with character limits",
+      "use": "Text-to-speech (TONY voice TTS)"
+    },
+    {
+      "name": "Firecrawl",
+      "env": "FIRECRAWL_API_KEY",
+      "url": "https://firecrawl.dev",
+      "freeTier": "Free scrape/search credits",
+      "use": "Web research MCP"
+    },
+    {
+      "name": "Playwright MCP",
+      "env": "PLAYWRIGHT_MCP_URL",
+      "url": "https://playwright.dev/docs/getting-started-mcp",
+      "freeTier": "100% free local — no API key",
+      "use": "Browser automation",
+      "local": true
+    }
+  ]
+}

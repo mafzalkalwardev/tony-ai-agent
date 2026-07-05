@@ -1,57 +1,82 @@
 const config = require('../config');
+const mcpClient = require('./mcp-client');
 
-/**
- * Playwright MCP bridge — calls local Playwright MCP server or falls back to fetch snapshot.
- * Set PLAYWRIGHT_MCP_URL=http://localhost:8931 for full browser automation.
- */
-async function navigate(url, options = {}) {
-  if (config.mcp.playwright.mcpUrl) {
-    return callMcpTool('browser_navigate', { url });
-  }
-  return fetchSnapshot(url, options);
+function mcpUrl() {
+  return config.mcp.playwright.mcpUrl || 'http://localhost:8931/mcp';
 }
 
-async function snapshot(url) {
-  if (config.mcp.playwright.mcpUrl) {
-    await callMcpTool('browser_navigate', { url });
-    return callMcpTool('browser_snapshot', {});
+async function navigate(url) {
+  const url_ = mcpUrl();
+  if (await mcpClient.isReachable(url_)) {
+    return { ...(await mcpClient.callTool(url_, 'browser_navigate', { url })), provider: 'playwright-mcp', url };
   }
   return fetchSnapshot(url);
 }
 
-async function callMcpTool(toolName, args) {
-  const response = await fetch(`${config.mcp.playwright.mcpUrl}/tools/${toolName}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(args),
-    signal: AbortSignal.timeout(60000),
-  });
-  const data = await response.json();
-  if (!response.ok) return { ok: false, error: data.error || `Playwright MCP HTTP ${response.status}` };
-  return { ok: true, provider: 'playwright-mcp', tool: toolName, result: data };
+async function snapshot(url) {
+  const url_ = mcpUrl();
+  if (await mcpClient.isReachable(url_)) {
+    await mcpClient.callTool(url_, 'browser_navigate', { url });
+    const snap = await mcpClient.callTool(url_, 'browser_snapshot', {});
+    return { ...snap, provider: 'playwright-mcp', url };
+  }
+  return fetchSnapshot(url);
 }
 
 async function fetchSnapshot(url) {
   if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'Only http(s) URLs allowed' };
+
+  const firecrawl = require('./firecrawl');
+  if (firecrawl.status().configured) {
+    const scraped = await firecrawl.scrape(url);
+    if (scraped.ok) {
+      return {
+        ok: true,
+        provider: 'firecrawl-fallback',
+        url,
+        content: scraped.content,
+        title: scraped.title,
+        note: 'Playwright MCP offline — used Firecrawl scrape instead',
+      };
+    }
+  }
+
   const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
   const html = await response.text();
-  const text = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   return {
     ok: true,
-    provider: 'playwright-fallback',
+    provider: 'fetch-fallback',
     url,
     status: response.status,
     content: text.slice(0, 8000),
-    note: 'Set PLAYWRIGHT_MCP_URL for full browser automation (microsoft/playwright-mcp)',
+    note: 'Start Playwright MCP: npm run playwright:mcp (see playwright.dev/docs/getting-started-mcp)',
   };
+}
+
+async function listTools() {
+  const url_ = mcpUrl();
+  if (!(await mcpClient.isReachable(url_))) {
+    return { ok: false, error: 'Playwright MCP not reachable', hint: 'npm run playwright:mcp' };
+  }
+  const tools = await mcpClient.listTools(url_);
+  return { ok: true, tools: tools.map((t) => t.name) };
 }
 
 function status() {
+  const url = mcpUrl();
   return {
     provider: 'playwright',
-    mcpConfigured: Boolean(config.mcp.playwright.mcpUrl),
-    fallback: true,
+    mcpUrl: url,
+    package: '@playwright/mcp',
+    docs: 'https://playwright.dev/docs/getting-started-mcp',
+    configured: Boolean(url),
+    mode: 'local-free',
   };
 }
 
-module.exports = { navigate, snapshot, status };
+module.exports = { navigate, snapshot, listTools, status, mcpClient };

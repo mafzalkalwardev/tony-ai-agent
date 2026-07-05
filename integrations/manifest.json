@@ -86,6 +86,41 @@
       "clone": "pbakaus/impeccable",
       "description": "Design vocabulary for AI — audit, polish, critique, 45 detector rules",
       "tags": ["design", "ui", "impeccable", "frontend"]
+    },
+    {
+      "name": "caveman",
+      "url": "https://github.com/JuliusBrussee/caveman",
+      "clone": "JuliusBrussee/caveman",
+      "description": "Token-efficient caveman speak — 65% fewer tokens",
+      "tags": ["caveman", "tokens", "compression"]
+    },
+    {
+      "name": "loop-engineering",
+      "url": "https://github.com/cobusgreyling/loop-engineering",
+      "clone": "cobusgreyling/loop-engineering",
+      "description": "Loop engineering patterns — loop-audit, loop-init, loop-cost for AI agents",
+      "tags": ["loop", "engineering", "orchestration"]
+    },
+    {
+      "name": "free-llm-api-resources",
+      "url": "https://github.com/cheahjs/free-llm-api-resources",
+      "clone": "cheahjs/free-llm-api-resources",
+      "description": "Curated list of free LLM inference APIs",
+      "tags": ["free", "llm", "api", "resources"]
+    },
+    {
+      "name": "collab-public",
+      "url": "https://github.com/collabs-inc/collab-public",
+      "clone": "collabs-inc/collab-public",
+      "description": "Collaborator — create with agents, public collaboration workspace",
+      "tags": ["collab", "agents", "public"]
+    },
+    {
+      "name": "tony-ai",
+      "url": "https://github.com/mafzalkalwardev/tony-ai",
+      "clone": "mafzalkalwardev/tony-ai",
+      "description": "Original TONY — local voice-first PyQt6 Windows assistant (faster-whisper, pyttsx3, safety, git tools)",
+      "tags": ["tony-ai", "desktop", "voice", "local", "pyqt6", "windows"]
     }
   ],
   "contextFiles": [
