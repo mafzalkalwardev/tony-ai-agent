@@ -60,12 +60,14 @@
     try {
       const h = await fetch('/health').then((r) => r.json());
       Voice.deepgramOk = h.mind?.voice?.stt?.configured;
-      Voice.elevenLabsOk = h.mind?.voice?.tts?.configured;
+      Voice.elevenLabsOk = h.mind?.voice?.tts?.elevenlabs?.configured || h.mind?.voice?.tts?.configured;
+      Voice.localTtsOk = h.mind?.voice?.tts?.local?.configured;
+      Voice.ttsOk = Voice.elevenLabsOk || Voice.localTtsOk;
       Voice.alwaysListen = h.companion?.alwaysListen !== false;
       Voice.minConfidence = h.voice?.minConfidence ?? 0.55;
       Voice.noiseCancel = h.voice?.noiseCancellation !== false;
       Voice.useBrowserStt = !Voice.deepgramOk && 'webkitSpeechRecognition' in window;
-      Voice.useBrowserTts = !Voice.elevenLabsOk && 'speechSynthesis' in window;
+      Voice.useBrowserTts = !Voice.ttsOk && 'speechSynthesis' in window;
 
       const mic = $('#micBtn');
       const spk = $('#speakerBtn');
@@ -89,9 +91,9 @@
           'ready',
           Voice.alwaysListen
             ? 'Auto-listen on boot'
-            : Voice.deepgramOk && Voice.elevenLabsOk
-              ? 'Voice ready · Deepgram + ElevenLabs'
-              : 'Voice ready · mixed mode'
+            : Voice.ttsOk
+              ? 'Voice ready · TTS online'
+              : 'Voice ready · browser speech'
         );
       }
     } catch {
@@ -314,28 +316,58 @@
     const audio = new Audio(`data:${mimeType};base64,${base64}`);
     setVoiceState('speaking', 'TONY is speaking…');
     $('#speakerBtn')?.classList.add('active');
-    await new Promise((resolve, reject) => {
-      audio.onended = resolve;
-      audio.onerror = reject;
-      audio.play().catch(reject);
-    });
+    Voice.pausedForSpeech = true;
+    Voice.voiceGate?.setPaused(true);
+    try {
+      await new Promise((resolve, reject) => {
+        audio.onended = resolve;
+        audio.onerror = () => reject(new Error('Audio playback failed'));
+        audio.play().catch(reject);
+      });
+    } finally {
+      Voice.pausedForSpeech = false;
+      Voice.voiceGate?.setPaused(false);
+    }
     $('#speakerBtn')?.classList.toggle('active', Voice.voiceOut);
-    setVoiceState('ready', Voice.voiceOut ? 'Voice output ON' : 'Voice ready');
+    setVoiceState(Voice.alwaysListening ? 'listening' : 'ready', Voice.voiceOut ? 'Voice output ON' : 'Voice ready');
   }
 
-  function browserSpeak(text) {
+  function waitForBrowserVoices() {
     return new Promise((resolve) => {
-      if (!Voice.useBrowserTts || !Voice.voiceOut) return resolve();
-      const u = new SpeechSynthesisUtterance(stripForSpeech(text));
-      u.rate = 1;
-      u.pitch = 1;
-      setVoiceState('speaking', 'TONY is speaking…');
-      u.onend = () => {
-        setVoiceState('ready', 'Voice ready');
-        resolve();
-      };
+      const voices = speechSynthesis.getVoices();
+      if (voices.length) return resolve(voices);
+      speechSynthesis.onvoiceschanged = () => resolve(speechSynthesis.getVoices());
+      setTimeout(() => resolve(speechSynthesis.getVoices()), 500);
+    });
+  }
+
+  async function browserSpeak(text) {
+    if (!('speechSynthesis' in window) || !Voice.voiceOut) return;
+    const clean = stripForSpeech(text);
+    if (!clean) return;
+
+    const voices = await waitForBrowserVoices();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.rate = 1;
+    u.pitch = 1;
+    const preferred =
+      voices.find((v) => /Microsoft.*Natural|Google.*English|Jenny|Guy/i.test(v.name)) ||
+      voices.find((v) => v.lang.startsWith('en')) ||
+      voices[0];
+    if (preferred) u.voice = preferred;
+
+    setVoiceState('speaking', 'TONY is speaking…');
+    Voice.pausedForSpeech = true;
+    Voice.voiceGate?.setPaused(true);
+    await new Promise((resolve) => {
+      u.onend = resolve;
+      u.onerror = resolve;
+      speechSynthesis.cancel();
       speechSynthesis.speak(u);
     });
+    Voice.pausedForSpeech = false;
+    Voice.voiceGate?.setPaused(false);
+    setVoiceState(Voice.alwaysListening ? 'listening' : 'ready', 'Voice ready');
   }
 
   async function speakResponse(text) {
@@ -343,31 +375,21 @@
     const clean = stripForSpeech(text);
     if (!clean) return;
 
-    Voice.pausedForSpeech = true;
-    Voice.voiceGate?.setPaused(true);
-
     try {
-      if (Voice.elevenLabsOk && window.tonyApi) {
-        try {
-          const res = await window.tonyApi('/api/voice/speak', {
-            method: 'POST',
-            body: JSON.stringify({ text: clean }),
-          });
-          if (res.ok && res.audio) {
-            await playBase64Audio(res.audio, res.mimeType || 'audio/mpeg');
-            return;
-          }
-        } catch {
-          /* fall through */
+      if (window.tonyApi) {
+        const res = await window.tonyApi('/api/voice/speak', {
+          method: 'POST',
+          body: JSON.stringify({ text: clean }),
+        });
+        if (res.ok && res.audio) {
+          await playBase64Audio(res.audio, res.mimeType || 'audio/mpeg');
+          return;
         }
       }
       await browserSpeak(clean);
-    } finally {
-      Voice.pausedForSpeech = false;
-      Voice.voiceGate?.setPaused(false);
-      if (Voice.alwaysListening) {
-        setVoiceState('listening', 'Noise-filtered listen — speak anytime');
-      }
+    } catch (e) {
+      console.warn('TTS failed, using browser voice:', e.message);
+      await browserSpeak(clean);
     }
   }
 

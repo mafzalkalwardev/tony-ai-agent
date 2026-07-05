@@ -15,7 +15,7 @@ const memory = require('../memory');
 const graphify = require('./graphify');
 const obsidian = require('./obsidian');
 const deepgram = require('../voice/deepgram');
-const elevenlabs = require('../voice/elevenlabs');
+const speakChain = require('../voice/speak');
 
 function assembleContext({ sessionId, userMessage, includeGraph = true, includeObsidian = true }) {
   const layers = {};
@@ -80,7 +80,7 @@ async function perceiveVoice({ audioBase64, mimeType }) {
 }
 
 async function expressVoice(text) {
-  const tts = await elevenlabs.speak(text);
+  const tts = await speakChain.speak(text);
   return { layer: 'expression', tts };
 }
 
@@ -91,7 +91,7 @@ function status() {
     obsidian: obsidian.status(),
     voice: {
       stt: deepgram.status(),
-      tts: elevenlabs.status(),
+      tts: speakChain.status(),
     },
   };
 }

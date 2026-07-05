@@ -4,14 +4,14 @@
 
 const config = require('../config');
 const deepgram = require('../voice/deepgram');
-const elevenlabs = require('../voice/elevenlabs');
+const speakChain = require('../voice/speak');
 const architectures = require('../brain/architectures');
 const { runAgent } = require('../core/agent');
 
 async function voiceStatus() {
   const arch = architectures.status();
   return {
-    enabled: deepgram.status().configured || elevenlabs.status().configured,
+    enabled: deepgram.status().configured || speakChain.status().configured,
     pattern: 'nova',
     stt: arch.voice.stt,
     tts: arch.voice.tts,
@@ -29,7 +29,7 @@ async function transcribeAudio({ audioBase64, mimeType = 'audio/wav' }) {
 }
 
 async function speakText(text, options = {}) {
-  return elevenlabs.speak(text, options);
+  return speakChain.speak(text, options);
 }
 
 async function voiceConverse({ sessionId, audioBase64, mimeType, speak = true }) {

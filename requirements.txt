@@ -10,6 +10,9 @@ Pillow>=10.0.0
 # Presentation creation (scripts/tony-presentation.py)
 python-pptx>=1.0.0
 
+# Free local TTS fallback when ElevenLabs library voices blocked (scripts/tony-tts.py)
+edge-tts>=6.1.0
+
 # Original tony-ai desktop assistant (integrations/repos/tony-ai after npm run integrations:init)
 # See skills/tony-desktop/SKILL.md — install inside that repo:
 #   cd integrations/repos/tony-ai && pip install -r requirements.txt

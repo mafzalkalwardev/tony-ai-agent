@@ -135,7 +135,7 @@
       const systems = [];
       systems.push(['Groq', h.llm === 'groq' ? 'ok' : 'warn']);
       systems.push(['Deepgram', h.mind?.voice?.stt?.configured ? 'ok' : 'warn']);
-      systems.push(['ElevenLabs', h.mind?.voice?.tts?.configured ? 'ok' : 'warn']);
+      systems.push(['TTS', h.mind?.voice?.tts?.configured ? 'ok' : 'warn']);
       systems.push(['CodeGraph', h.codegraph?.nodes > 0 ? 'ok' : 'warn']);
       systems.push(['OpenWiki', h.mcp?.openwiki?.hasLocalWiki || h.mcp?.openwiki?.configured ? 'ok' : 'warn']);
       systems.push(['Scraper', h.mcp?.['scraper-media']?.configured || h.mcp?.firecrawl?.configured ? 'ok' : 'warn']);
@@ -182,7 +182,7 @@
         result.toolResults?.map((t) => t.tool),
         window.tonyResolveAttachments?.(result)
       );
-      if (window.tonyVoice?.Voice?.voiceOut) window.tonyVoice.speakResponse(result.response);
+      if (window.tonyVoice?.Voice?.voiceOut) await window.tonyVoice.speakResponse(result.response);
     } catch (e) {
       thinking.remove();
       addMessage('assistant', `Error: ${e.message}`);

@@ -144,6 +144,9 @@ module.exports = {
     autoEmpathy: env('TONY_COMPANION_EMPATHY', 'true') === 'true',
     alwaysListen: env('TONY_ALWAYS_LISTEN', 'true') === 'true',
   },
+  tts: {
+    localVoice: env('TONY_TTS_LOCAL_VOICE', 'en-US-GuyNeural'),
+  },
   jan: {
     enabled: env('JAN_ENABLED', 'true') === 'true',
     baseUrl: env('JAN_API_URL', 'http://localhost:1337/v1'),
