@@ -26,7 +26,22 @@ function assert(name, condition) {
 async function main() {
   console.log('=== TONY Agent Tests ===\n');
 
-  assert('tools registered', listTools().length >= 38);
+  assert('tools registered', listTools().length >= 45);
+
+  const openwiki = require('../src/mcp/openwiki');
+  assert('openwiki mcp', typeof openwiki.search === 'function');
+
+  const scraper = require('../src/mcp/scraper-media');
+  assert('scraper-media mcp', typeof scraper.scrape === 'function');
+
+  const motion = require('../src/mcp/motiongraph');
+  assert('motiongraph mcp', typeof motion.mapAesthetic === 'function');
+
+  const obsSkills = require('../src/mcp/obsidian-skills');
+  assert('obsidian-skills', typeof obsSkills.listSkills === 'function');
+
+  const daemon = require('../src/daemon/index');
+  assert('24/7 daemon', typeof daemon.runDaemon === 'function');
 
   const { classifyCommand, canRunCommand } = require('../src/safety/policy');
   assert('safety blocks rm -rf', classifyCommand('rm -rf /').level === 'BLOCKED');
@@ -79,7 +94,7 @@ async function main() {
   goalStore.complete(testGoal.id, 'test done');
 
   const manifest = require('../integrations/manifest.json');
-  assert('integrations manifest', manifest.repos.length >= 15);
+  assert('integrations manifest', manifest.repos.length >= 20);
 
   const structures = require('../src/knowledge/structures');
   const multi = await structures.queryAll('agent', { structures: ['graph', 'repo'] });

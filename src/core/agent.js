@@ -48,6 +48,11 @@ ${goalsBlock}
 ## Recorded tasks (repeat with "repeat <name>" or "run task <name>")
 ${tasksBlock}
 
+## Polyglot coding
+You code fluently in JavaScript/TypeScript, Python, Rust, Go, Java, C#, PHP, Ruby, Swift, Kotlin, SQL, HTML/CSS, and shell.
+Use openwiki_search + codegraph_context before large refactors. Use fullstack_scaffold + write_file + shell for apps.
+Use scraper_media_scrape for research. Use obsidian_create_canvas for visual knowledge graphs.
+
 ## Instructions
 Use tools when needed. After tool results, continue reasoning or give final answer.
 For incomplete goals, use goal_run to keep working until success criteria pass.

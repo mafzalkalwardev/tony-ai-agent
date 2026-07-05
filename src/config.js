@@ -85,6 +85,21 @@ module.exports = {
       port: Number(env('PLAYWRIGHT_MCP_PORT', '8931')),
       headless: env('PLAYWRIGHT_MCP_HEADLESS', 'true') === 'true',
     },
+    openwiki: {
+      mcpUrl: env('OPENWIKI_MCP_URL', ''),
+      docsUrl: env('OPENWIKI_DOCS_URL', 'http://localhost:8090'),
+    },
+    scraperMedia: {
+      mcpUrl: env('SCRAPER_MEDIA_MCP_URL', ''),
+    },
+    motiongraph: {
+      mcpUrl: env('MOTIONGRAPH_MCP_URL', ''),
+    },
+  },
+  daemon: {
+    enabled: env('TONY_DAEMON_ENABLED', 'false') === 'true',
+    autoGoals: env('TONY_DAEMON_AUTO_GOALS', 'true') === 'true',
+    intervalMs: Number(env('TONY_DAEMON_INTERVAL_MS', '300000')),
   },
   /** Prefer local/free tools when paid MCP keys missing */
   localFirst: env('TONY_LOCAL_FIRST', 'true') === 'true',

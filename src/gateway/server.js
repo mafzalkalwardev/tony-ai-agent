@@ -15,6 +15,14 @@ app.use(express.json({ limit: '10mb' }));
 const publicDir = path.join(__dirname, '../../public');
 app.use(express.static(publicDir));
 
+app.get('/', (_req, res) => {
+  res.redirect('/jarvis.html');
+});
+
+app.get('/jarvis', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'jarvis.html'));
+});
+
 function auth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.replace(/^Bearer\s+/i, '') || req.query.token;
@@ -34,7 +42,7 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.4.0',
+    version: '2.5.0',
     llm: config.llmProvider,
     llmChain: require('../llm').providerStatus(),
     online,

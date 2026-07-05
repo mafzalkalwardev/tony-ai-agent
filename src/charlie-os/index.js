@@ -24,7 +24,7 @@ function banner() {
 ╔══════════════════════════════════════════╗
 ║  CHARLIE OS  ·  TONY Agent Runtime       ║
 ║  Groq brain · Deepgram · ElevenLabs      ║
-║  Graphify · Obsidian · Paul builder      ║
+║  JARVIS UI · 24/7 daemon · OpenWiki · Motiongraph      ║
 ╚══════════════════════════════════════════╝
 `);
 }

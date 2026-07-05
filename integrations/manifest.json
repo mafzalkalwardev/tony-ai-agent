@@ -121,6 +121,34 @@
       "clone": "mafzalkalwardev/tony-ai",
       "description": "Original TONY — local voice-first PyQt6 Windows assistant (faster-whisper, pyttsx3, safety, git tools)",
       "tags": ["tony-ai", "desktop", "voice", "local", "pyqt6", "windows"]
+    },
+    {
+      "name": "openwiki",
+      "url": "https://github.com/langchain-ai/openwiki",
+      "clone": "langchain-ai/openwiki",
+      "description": "Agent repo documentation wiki — keeps codebase docs updated for coding agents",
+      "tags": ["openwiki", "docs", "wiki", "agents"]
+    },
+    {
+      "name": "obsidian-skills",
+      "url": "https://github.com/kepano/obsidian-skills",
+      "clone": "kepano/obsidian-skills",
+      "description": "Official Obsidian agent skills — markdown, bases, JSON canvas, CLI, defuddle",
+      "tags": ["obsidian", "skills", "canvas", "vault"]
+    },
+    {
+      "name": "scraper-mcp",
+      "url": "https://github.com/cotdp/scraper-mcp",
+      "clone": "cotdp/scraper-mcp",
+      "description": "Scraper Media MCP — token-optimized web scraping with markdown output",
+      "tags": ["scraper", "mcp", "media", "web"]
+    },
+    {
+      "name": "motion-graphics-mcp",
+      "url": "https://github.com/dmarsters/motion-graphics-mcp",
+      "clone": "dmarsters/motion-graphics-mcp",
+      "description": "Motiongraph — procedural motion graphics OBJECT/LOOK/ACTION for Three.js/HUD",
+      "tags": ["motiongraph", "mcp", "graphics", "hud"]
     }
   ],
   "contextFiles": [
@@ -135,6 +163,10 @@
     "firecrawl",
     "quickbooks",
     "higgsfield",
-    "playwright"
+    "playwright",
+    "openwiki",
+    "scraper-media",
+    "motiongraph",
+    "obsidian-skills"
   ]
 }

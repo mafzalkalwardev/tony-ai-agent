@@ -3,6 +3,10 @@ const firecrawl = require('./firecrawl');
 const quickbooks = require('./quickbooks');
 const higgsfield = require('./higgsfield');
 const playwright = require('./playwright');
+const openwiki = require('./openwiki');
+const scraperMedia = require('./scraper-media');
+const motiongraph = require('./motiongraph');
+const obsidianSkills = require('./obsidian-skills');
 const graphify = require('../brain/graphify');
 const structures = require('../knowledge/structures');
 
@@ -12,6 +16,10 @@ const providers = {
   quickbooks,
   higgsfield,
   playwright,
+  openwiki,
+  'scraper-media': scraperMedia,
+  motiongraph,
+  'obsidian-skills': obsidianSkills,
 };
 
 function statusAll() {
@@ -71,4 +79,8 @@ module.exports = {
   quickbooks,
   higgsfield,
   playwright,
+  openwiki,
+  scraperMedia,
+  motiongraph,
+  obsidianSkills,
 };

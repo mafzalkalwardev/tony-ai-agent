@@ -74,7 +74,37 @@ npm run integrations:status
 
 **Bundled repos:** superpowers, awesome-claude-code, claude-squad, karpathy-guidelines, claude-subconscious, playwright-mcp, tdd-guardian, wshobson-agents, repomix, everything-claude-code, ponytail, impeccable, **tony-ai** (original desktop assistant)
 
-### tony-ai integration (original project)
+## JARVIS Desktop UI (Iron Man HUD)
+
+The **default UI** is now the JARVIS desktop experience — arc reactor, neural graph lines, cyan HUD:
+
+```powershell
+npm run charlie          # starts gateway
+npm run desktop          # opens JARVIS in Edge/Chrome app window (no browser tabs)
+```
+
+Open manually: `http://localhost:8787/jarvis`
+
+### 24/7 continuous operation
+
+```powershell
+npm run mcp:stack        # Playwright + optional MCP servers
+npm run tony:daemon      # Gateway watchdog + goal ticks + hourly graph rebuild
+```
+
+Set `TONY_DAEMON_ENABLED=true` in `.env` to auto-start daemon with Charlie.
+
+### New MCP integrations
+
+| MCP | Purpose | Env |
+|-----|---------|-----|
+| OpenWiki | Repo docs for coding agents | `OPENWIKI_MCP_URL` |
+| Scraper Media | LLM-optimized web scrape | `SCRAPER_MEDIA_MCP_URL` |
+| Motiongraph | HUD / motion graphics | `MOTIONGRAPH_MCP_URL` |
+| obsidian-skills | Canvas, bases, vault CLI | `npm run integrations:init` |
+
+Tools: `openwiki_search`, `scraper_media_scrape`, `motiongraph_aesthetic`, `obsidian_create_canvas`, `fullstack_scaffold`, `mcp_call`
+
 
 Your first repo [tony-ai](https://github.com/mafzalkalwardev/tony-ai) is now bundled:
 

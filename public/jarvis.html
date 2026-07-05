@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TONY · JARVIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/jarvis.css" />
+</head>
+<body>
+  <canvas id="hudCanvas"></canvas>
+  <div class="scanlines"></div>
+
+  <div class="jarvis-app">
+    <header class="hud-top">
+      <div class="hud-brand">
+        <div class="arc-reactor" id="arcReactor"><div class="arc-core"></div></div>
+        <div>
+          <h1>TONY</h1>
+          <p class="subtitle">Just A Rather Very Intelligent System</p>
+        </div>
+      </div>
+      <div class="hud-stats" id="hudStats">
+        <div class="stat-ring"><span>BRAIN</span><strong id="statBrain">—</strong></div>
+        <div class="stat-ring"><span>TOOLS</span><strong id="statTools">—</strong></div>
+        <div class="stat-ring"><span>GRAPH</span><strong id="statGraph">—</strong></div>
+        <div class="stat-ring"><span>MODE</span><strong id="statMode">ONLINE</strong></div>
+      </div>
+      <div class="clock" id="hudClock">00:00:00</div>
+    </header>
+
+    <aside class="hud-left">
+      <nav class="hud-nav">
+        <button class="hud-nav-btn active" data-panel="command">◈ Command</button>
+        <button class="hud-nav-btn" data-panel="workflows">⚡ Workflows</button>
+        <button class="hud-nav-btn" data-panel="graph">◎ Neural Graph</button>
+        <button class="hud-nav-btn" data-panel="systems">⬡ Systems</button>
+      </nav>
+      <div class="system-list" id="systemList"></div>
+    </aside>
+
+    <main class="hud-main">
+      <section class="panel active" id="panel-command">
+        <div class="voice-hud" id="voiceBar" data-state="ready">
+          <button type="button" class="hud-mic" id="micBtn" title="Speak to TONY">
+            <span class="mic-ring"></span>
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+          </button>
+          <div class="voice-label">
+            <strong id="voiceStatus">JARVIS online — awaiting input</strong>
+            <span>Deepgram listen · ElevenLabs speak · Hold Space</span>
+          </div>
+          <button type="button" class="hud-speaker active" id="speakerBtn" title="Voice output">🔊</button>
+        </div>
+        <div class="messages" id="messages"></div>
+        <form class="hud-composer" id="chatForm">
+          <input type="text" id="chatInput" placeholder="Command TONY… code, build, research, deploy" autofocus />
+          <button type="submit" class="hud-send">EXECUTE</button>
+        </form>
+      </section>
+
+      <section class="panel" id="panel-workflows">
+        <h2>Automated Workflows</h2>
+        <p class="panel-desc">24/7 capable — builds apps in any language, runs until success criteria pass.</p>
+        <form id="workflowForm" class="hud-form">
+          <textarea id="workflowTask" rows="3" placeholder="Build a React dashboard with auth, deploy-ready…"></textarea>
+          <select id="workflowMode">
+            <option value="auto">Auto mode</option>
+            <option value="goal">Goal loop</option>
+            <option value="crew">Multi-agent crew</option>
+          </select>
+          <label><input type="checkbox" id="workflowSpeak" checked /> Speak result</label>
+          <button type="submit" class="hud-send">RUN WORKFLOW</button>
+        </form>
+      </section>
+
+      <section class="panel" id="panel-graph">
+        <h2>Knowledge Graph</h2>
+        <canvas id="graphCanvas" width="800" height="400"></canvas>
+        <button type="button" id="rebuildGraph" class="hud-btn-secondary">Rebuild Graphify</button>
+      </section>
+
+      <section class="panel" id="panel-systems">
+        <h2>MCP & Integrations</h2>
+        <div id="mcpGrid" class="mcp-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="tokenDialog">
+    <form method="dialog">
+      <h3>Authorization required</h3>
+      <input type="password" id="tokenInput" placeholder="TONY_API_TOKEN" />
+      <button value="ok">Connect</button>
+    </form>
+  </dialog>
+
+  <script src="/js/voice.js"></script>
+  <script src="/js/jarvis.js"></script>
+</body>
+</html>

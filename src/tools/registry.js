@@ -631,6 +631,144 @@ const builtins = {
     },
   },
 
+  openwiki_search: {
+    name: 'openwiki_search',
+    description: 'Search OpenWiki repo documentation for coding context',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+    async execute({ query }) {
+      return require('../mcp/openwiki').search(query);
+    },
+  },
+
+  openwiki_overview: {
+    name: 'openwiki_overview',
+    description: 'Get OpenWiki architecture overview / mermaid diagram for a project',
+    parameters: {
+      type: 'object',
+      properties: { project: { type: 'string' } },
+    },
+    async execute({ project }) {
+      return require('../mcp/openwiki').overview(project);
+    },
+  },
+
+  scraper_media_scrape: {
+    name: 'scraper_media_scrape',
+    description: 'Scrape URL to LLM-optimized markdown via Scraper Media MCP (or Firecrawl fallback)',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        render_js: { type: 'boolean' },
+        css_selector: { type: 'string' },
+      },
+      required: ['url'],
+    },
+    async execute({ url, render_js, css_selector }) {
+      return require('../mcp/scraper-media').scrape(url, { render_js, css_selector });
+    },
+  },
+
+  motiongraph_aesthetic: {
+    name: 'motiongraph_aesthetic',
+    description: 'Get motion graphics / HUD aesthetic parameters (Iron Man JARVIS style visuals)',
+    parameters: {
+      type: 'object',
+      properties: {
+        object: { type: 'string' },
+        look: { type: 'string' },
+        action: { type: 'string' },
+      },
+    },
+    async execute({ object, look, action }) {
+      return require('../mcp/motiongraph').mapAesthetic(object, look, action);
+    },
+  },
+
+  obsidian_skill: {
+    name: 'obsidian_skill',
+    description: 'Load obsidian-skills spec (markdown, canvas, bases, CLI) from kepano/obsidian-skills',
+    parameters: {
+      type: 'object',
+      properties: {
+        skill: {
+          type: 'string',
+          enum: ['obsidian-markdown', 'obsidian-bases', 'json-canvas', 'obsidian-cli', 'defuddle'],
+        },
+      },
+      required: ['skill'],
+    },
+    async execute({ skill }) {
+      return require('../mcp/obsidian-skills').readSkill(skill);
+    },
+  },
+
+  obsidian_create_canvas: {
+    name: 'obsidian_create_canvas',
+    description: 'Create JSON Canvas diagram in Obsidian vault (JARVIS neural graph)',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        nodes: { type: 'array' },
+        edges: { type: 'array' },
+      },
+      required: ['title'],
+    },
+    async execute({ title, nodes, edges }) {
+      return require('../mcp/obsidian-skills').createCanvas(title, nodes, edges);
+    },
+  },
+
+  mcp_call: {
+    name: 'mcp_call',
+    description: 'Call any configured MCP server tool by URL (advanced)',
+    parameters: {
+      type: 'object',
+      properties: {
+        server: { type: 'string', enum: ['playwright', 'openwiki', 'scraper-media', 'motiongraph'] },
+        tool: { type: 'string' },
+        args: { type: 'object' },
+      },
+      required: ['server', 'tool'],
+    },
+    async execute({ server, tool, args = {} }) {
+      const config = require('../config');
+      const hub = require('../mcp/hub');
+      const urls = {
+        playwright: config.mcp.playwright.mcpUrl,
+        openwiki: config.mcp.openwiki.mcpUrl,
+        'scraper-media': config.mcp.scraperMedia.mcpUrl,
+        motiongraph: config.mcp.motiongraph.mcpUrl,
+      };
+      return hub.callServer(urls[server], tool, args);
+    },
+  },
+
+  fullstack_scaffold: {
+    name: 'fullstack_scaffold',
+    description:
+      'Scaffold a full-stack app (React, Vue, Next, Express, Python FastAPI, etc.) — creates project structure via write_file',
+    parameters: {
+      type: 'object',
+      properties: {
+        stack: { type: 'string', description: 'e.g. nextjs, react-vite, vue, fastapi, django' },
+        name: { type: 'string' },
+        features: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['stack', 'name'],
+    },
+    async execute({ stack, name, features = [] }, sessionId) {
+      const paul = require('../agents/paul');
+      const task = `Scaffold ${stack} project "${name}" with features: ${features.join(', ') || 'basic CRUD + auth'}. Polyglot production-ready code.`;
+      return paul.build(task, sessionId, { constraints: 'Minimal deps, working npm/pip scripts, README' });
+    },
+  },
+
   tony_desktop_status: {
     name: 'tony_desktop_status',
     description: 'Status of original tony-ai Python desktop assistant integration',

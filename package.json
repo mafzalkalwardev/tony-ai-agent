@@ -1,6 +1,6 @@
 {
   "name": "tony-agent",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "TONY — Groq brain, MCP integrations, goal-driven agent, graphify, Obsidian brain, Charlie OS",
   "main": "src/index.js",
   "type": "commonjs",
@@ -24,7 +24,11 @@
     "playwright:mcp": "node scripts/playwright-mcp.js",
     "test:live": "node scripts/test-live.js",
     "codegraph:sync": "codegraph sync",
-    "codegraph:index": "codegraph index"
+    "codegraph:index": "codegraph index",
+    "mcp:stack": "node scripts/start-mcp-stack.js",
+    "tony:daemon": "node src/daemon/index.js",
+    "desktop": "node scripts/launch-desktop.js",
+    "openwiki:init": "npx --yes @langchain/openwiki --init -p || echo Install openwiki CLI separately"
   },
   "engines": {
     "node": ">=20"
