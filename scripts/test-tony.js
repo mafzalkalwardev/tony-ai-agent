@@ -26,7 +26,62 @@ function assert(name, condition) {
 async function main() {
   console.log('=== TONY Agent Tests ===\n');
 
-  assert('tools registered', listTools().length >= 45);
+  assert('tools registered', listTools().length >= 53);
+
+  const persona = require('../src/companion/persona');
+  assert('marvel persona', persona.matchMediaTopic('Iron Man is great').length >= 1);
+  assert('novel persona', persona.matchMediaTopic('Jannat Ke Pattay').length >= 1);
+
+  const profile = require('../src/memory/profile');
+  profile.learnFromMessage('My name is Afzal and I love movie Iron Man');
+  assert('user profile', profile.load().name.includes('Afzal'));
+
+  const jan = require('../src/llm/jan');
+  assert('jan provider', typeof jan.complete === 'function');
+
+  const automation = require('../src/bridge/automation');
+  assert('automation bridge', typeof automation.run === 'function');
+
+  const presentation = require('../src/bridge/presentation');
+  assert('presentation bridge', typeof presentation.create === 'function');
+
+  const voiceFilter = require('../src/voice/filter');
+  assert('voice noise filter', voiceFilter.isLikelyNoiseTranscript('hmm', 0.9).noise === true);
+  assert('voice keeps speech', voiceFilter.isLikelyNoiseTranscript('wake up Tony', 0.8).noise === false);
+
+  const ctx = require('../src/llm/context-budget');
+  const huge = { ok: true, imageBase64: 'A'.repeat(50000) };
+  const safe = ctx.sanitizeToolResult(huge);
+  assert('strips base64', safe.imageBase64.includes('omitted'));
+  const trimmed = ctx.trimMessages(
+    [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'old' },
+      { role: 'assistant', content: 'reply' },
+      { role: 'user', content: 'new' },
+    ],
+    50
+  );
+  assert('trims messages', trimmed.length >= 2);
+
+  const errors = require('../src/memory/errors');
+  const lesson = errors.record({ tool: 'test', error: 'fetch failed', fix: 'restart gateway', outcome: 'resolved' });
+  assert('error memory', Boolean(lesson.id));
+  assert('error search', errors.search('fetch failed').length >= 1);
+
+  const { analyzeFailure } = require('../src/core/reflexion');
+  assert('reflexion module', typeof analyzeFailure === 'function');
+
+  const companion = require('../src/companion/wake');
+  assert('wake phrase', companion.isWakePhrase('Wake up Tony'));
+  assert('not wake', !companion.isWakePhrase('hello'));
+
+  const { detectMood } = require('../src/companion/mood');
+  assert('sad mood', detectMood('I am sad today') === 'sad');
+
+  const habits = require('../src/companion/habits');
+  habits.recordInteraction({ message: 'wake test', mood: 'neutral', isWake: true, sessionId: 't' });
+  assert('habits summary', habits.summary().wakeCount >= 1);
 
   const openwiki = require('../src/mcp/openwiki');
   assert('openwiki mcp', typeof openwiki.search === 'function');

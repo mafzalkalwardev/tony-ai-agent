@@ -149,6 +149,13 @@
       "clone": "dmarsters/motion-graphics-mcp",
       "description": "Motiongraph — procedural motion graphics OBJECT/LOOK/ACTION for Three.js/HUD",
       "tags": ["motiongraph", "mcp", "graphics", "hud"]
+    },
+    {
+      "name": "jan",
+      "url": "https://github.com/janhq/jan",
+      "clone": "janhq/jan",
+      "description": "Jan.ai — local open-source LLM desktop app with OpenAI-compatible API at localhost:1337",
+      "tags": ["jan", "local-llm", "offline", "open-source"]
     }
   ],
   "contextFiles": [
@@ -156,7 +163,10 @@
     "context/AGENTS.md",
     "context/karpathy-guidelines.md",
     "context/subconscious.md",
-    "context/enterprise-hardening.md"
+    "context/enterprise-hardening.md",
+    "context/prompt-techniques.md",
+    "context/marvel-novels.md",
+    "context/realtime-automation.md"
   ],
   "mcpServers": [
     "perplexity",

@@ -209,6 +209,37 @@ body {
 
 .hud-mic.active { box-shadow: 0 0 30px var(--glow); }
 
+.voice-hud.always-on {
+  border-color: rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.15);
+}
+
+.voice-hud.always-on .hud-mic {
+  animation: pulse-mic 2s ease-in-out infinite;
+}
+
+@keyframes pulse-mic {
+  0%, 100% { box-shadow: 0 0 12px rgba(0, 229, 255, 0.4); }
+  50% { box-shadow: 0 0 28px rgba(0, 229, 255, 0.85); }
+}
+
+.mic-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  pointer-events: none;
+}
+
+.voice-hud.always-on .mic-ring {
+  animation: ring-expand 2.5s ease-out infinite;
+}
+
+@keyframes ring-expand {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;

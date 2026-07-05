@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const config = require('../config');
+const { trimEpisodeContent } = require('../llm/context-budget');
 
 let db;
 
@@ -41,9 +42,10 @@ function getDb() {
 }
 
 function appendEpisode(sessionId, role, content, metadata = null) {
+  const trimmed = trimEpisodeContent(content, config.context?.episodeMaxChars || 6000);
   getDb()
     .prepare('INSERT INTO episodes (session_id, role, content, metadata) VALUES (?, ?, ?, ?)')
-    .run(sessionId, role, content, metadata ? JSON.stringify(metadata) : null);
+    .run(sessionId, role, trimmed, metadata ? JSON.stringify(metadata) : null);
 }
 
 function appendToolTrace(sessionId, toolName, args, result, ok = true) {
@@ -53,10 +55,15 @@ function appendToolTrace(sessionId, toolName, args, result, ok = true) {
 }
 
 function getSessionHistory(sessionId, limit = 40) {
+  const maxChars = config.context?.episodeMaxChars || 6000;
   return getDb()
     .prepare('SELECT role, content, created_at FROM episodes WHERE session_id = ? ORDER BY id DESC LIMIT ?')
     .all(sessionId, limit)
-    .reverse();
+    .reverse()
+    .map((row) => ({
+      ...row,
+      content: trimEpisodeContent(row.content, maxChars),
+    }));
 }
 
 function searchEpisodes(query, limit = 10) {

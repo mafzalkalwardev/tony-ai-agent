@@ -790,6 +790,184 @@ const builtins = {
       return require('../bridge/tony-desktop').runTextCommand(text);
     },
   },
+
+  desktop_automate: {
+    name: 'desktop_automate',
+    description:
+      'Windows desktop automation via pyautogui — click, type, hotkey, screenshot, move mouse. Use for realtime laptop tasks, opening apps, form filling on native UI.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['click', 'type', 'hotkey', 'screenshot', 'move', 'position'],
+        },
+        x: { type: 'number' },
+        y: { type: 'number' },
+        text: { type: 'string' },
+        keys: { type: 'array', items: { type: 'string' } },
+        duration: { type: 'number' },
+      },
+      required: ['action'],
+    },
+    async execute(payload) {
+      const automation = require('../bridge/automation');
+      if (!require('../config').automation?.enabled) {
+        return { ok: false, error: 'Desktop automation disabled — set TONY_AUTOMATION_ENABLED=true' };
+      }
+      return automation.run(payload);
+    },
+  },
+
+  presentation_create: {
+    name: 'presentation_create',
+    description:
+      'Create a PowerPoint .pptx presentation from title and slides (realtime laptop task). Saves to data/presentations/. Open with desktop_automate or tell user the path.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Presentation title' },
+        slides: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              bullets: { type: 'array', items: { type: 'string' } },
+            },
+          },
+          description: 'Slide list with title and bullet points',
+        },
+      },
+      required: ['title'],
+    },
+    async execute({ title, slides }) {
+      const presentation = require('../bridge/presentation');
+      return presentation.create({ title, slides });
+    },
+  },
+
+  user_profile_get: {
+    name: 'user_profile_get',
+    description: 'Read personal profile TONY builds about the user — name, movies, novels, facts, preferences',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      const profile = require('../memory/profile');
+      return { ok: true, profile: profile.load(), formatted: profile.formatForAgent() };
+    },
+  },
+
+  user_profile_update: {
+    name: 'user_profile_update',
+    description: 'Update user profile — name, interests, favorite movies/novels, personality notes, facts',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        nicknames: { type: 'array', items: { type: 'string' } },
+        interests: { type: 'array', items: { type: 'string' } },
+        favoriteMovies: { type: 'array', items: { type: 'string' } },
+        favoriteNovels: { type: 'array', items: { type: 'string' } },
+        personalityNotes: { type: 'array', items: { type: 'string' } },
+        fact: { type: 'string' },
+      },
+    },
+    async execute({ fact, ...partial }) {
+      const profile = require('../memory/profile');
+      if (fact) profile.addFact(fact, ['agent']);
+      const updated = profile.update(partial);
+      return { ok: true, profile: updated };
+    },
+  },
+
+  error_log: {
+    name: 'error_log',
+    description: 'List recent errors TONY learned from and their fixes',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' }, limit: { type: 'number' } },
+    },
+    async execute({ query, limit }) {
+      const errors = require('../memory/errors');
+      const lessons = query ? errors.search(query, limit || 10) : errors.recent(limit || 15);
+      return { ok: true, lessons, formatted: errors.formatForAgent(lessons) };
+    },
+  },
+
+  error_learn: {
+    name: 'error_learn',
+    description: 'Record a mistake and the fix that worked — TONY remembers for next time',
+    parameters: {
+      type: 'object',
+      properties: {
+        tool: { type: 'string' },
+        error: { type: 'string' },
+        fix: { type: 'string' },
+        context: { type: 'string' },
+      },
+      required: ['error', 'fix'],
+    },
+    async execute({ tool, error, fix, context }, sessionId) {
+      const lesson = require('../memory/errors').record({
+        tool: tool || 'agent',
+        error,
+        fix,
+        context: context || '',
+        sessionId,
+        outcome: 'resolved',
+      });
+      return { ok: true, lesson, message: 'Fix saved — TONY will apply this when similar errors occur' };
+    },
+  },
+
+  companion_wake: {
+    name: 'companion_wake',
+    description: 'Wake up TONY — time-based greeting, praise, work done/remaining, persona mode',
+    parameters: {
+      type: 'object',
+      properties: { message: { type: 'string' } },
+    },
+    async execute({ message }, sessionId) {
+      return require('../companion/wake').generateWakeResponse({
+        sessionId,
+        message: message || 'Wake up Tony',
+      });
+    },
+  },
+
+  habit_summary: {
+    name: 'habit_summary',
+    description: 'Show habits TONY learned automatically (wake times, topics, moods)',
+    parameters: { type: 'object', properties: {} },
+    async execute() {
+      const habits = require('../companion/habits');
+      return { ok: true, ...habits.summary(), formatted: habits.formatForAgent() };
+    },
+  },
+
+  self_heal: {
+    name: 'self_heal',
+    description: 'Analyze last tool failure and attempt automatic fix/retry',
+    parameters: {
+      type: 'object',
+      properties: {
+        tool: { type: 'string' },
+        error: { type: 'string' },
+        message: { type: 'string' },
+      },
+      required: ['tool', 'error'],
+    },
+    async execute({ tool, error, message }, sessionId) {
+      const { attemptSelfHeal } = require('../core/reflexion');
+      return attemptSelfHeal({
+        message: message || 'self-heal request',
+        tool,
+        args: {},
+        result: { ok: false, error },
+        sessionId,
+      });
+    },
+  },
 };
 
 // SignalMint tools

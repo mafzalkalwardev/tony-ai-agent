@@ -42,11 +42,25 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.5.0',
+    version: '2.7.0',
     llm: config.llmProvider,
     llmChain: require('../llm').providerStatus(),
     online,
     connectivity: connStatus(),
+    companion: {
+      enabled: config.companion.enabled,
+      userName: config.companion.userName,
+      alwaysListen: config.companion.alwaysListen,
+    },
+    jan: require('../llm/jan').status(),
+    automation: require('../bridge/automation').status(),
+    presentation: require('../bridge/presentation').status(),
+    profile: require('../memory/profile').load().name,
+    voice: {
+      noiseCancellation: config.voice.noiseCancellation,
+      minConfidence: config.voice.minConfidence,
+      highPassHz: config.voice.highPassHz,
+    },
     skills: require('../skills/loader').listSkills().length,
     tools: require('../tools/registry').listTools().length,
     mind: architectures.status(),
@@ -136,6 +150,34 @@ app.post('/api/voice/converse', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+app.post('/api/companion/wake', auth, async (req, res) => {
+  try {
+    const { message, sessionId = randomUUID() } = req.body || {};
+    const result = await require('../companion/wake').generateWakeResponse({ sessionId, message });
+    res.json({ sessionId, ...result });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/companion/habits', auth, (_req, res) => {
+  const habits = require('../companion/habits');
+  res.json({ ok: true, ...habits.summary(), formatted: habits.formatForAgent() });
+});
+
+app.get('/api/profile', auth, (_req, res) => {
+  const profile = require('../memory/profile');
+  res.json({ ok: true, profile: profile.load(), formatted: profile.formatForAgent() });
+});
+
+app.post('/api/profile', auth, (req, res) => {
+  const profile = require('../memory/profile');
+  const { fact, ...partial } = req.body || {};
+  if (fact) profile.addFact(fact, ['api']);
+  const updated = Object.keys(partial).length ? profile.update(partial) : profile.load();
+  res.json({ ok: true, profile: updated });
 });
 
 app.get('/api/brain/status', auth, (_req, res) => {

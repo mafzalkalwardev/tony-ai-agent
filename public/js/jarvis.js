@@ -1,29 +1,19 @@
 (() => {
   const TOKEN_KEY = 'tony_api_token';
   const SESSION_KEY = 'tony_session_id';
-  let token = localStorage.getItem(TOKEN_KEY) || new URLSearchParams(location.search).get('token') || '';
+  const urlToken = window.tonyResolveToken?.();
+  let token = urlToken || localStorage.getItem(TOKEN_KEY) || '';
+  if (urlToken) localStorage.setItem(TOKEN_KEY, urlToken);
   let sessionId = localStorage.getItem(SESSION_KEY) || crypto.randomUUID();
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => document.querySelectorAll(s);
 
-  function api(path, opts = {}) {
-    return fetch(path, {
-      ...opts,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        ...(opts.headers || {}),
-      },
-    }).then(async (r) => {
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-      return data;
-    });
-  }
+  const api = window.tonyCreateApi(() => token);
 
   window.tonyApi = api;
   window.tonySessionId = () => sessionId;
   window.tonyLangPrefix = () => '';
+  window.tonyUserName = () => window.__tonyUserName || 'Muhammad Afzal';
   window.tonyAddMessage = addMessage;
 
   function addMessage(role, content, tools) {
@@ -134,6 +124,10 @@
       $('#statTools').textContent = h.tools || '—';
       $('#statGraph').textContent = h.mind?.graphify?.nodes || h.codegraph?.nodes || '—';
       $('#statMode').textContent = h.online ? 'ONLINE' : 'LOCAL';
+      if (h.companion?.userName) {
+        window.__tonyUserName = h.companion.userName;
+        document.title = `TONY · JARVIS — ${h.companion.userName}`;
+      }
 
       const systems = [];
       systems.push(['Groq', h.llm === 'groq' ? 'ok' : 'warn']);
@@ -143,7 +137,8 @@
       systems.push(['OpenWiki', h.mcp?.openwiki?.hasLocalWiki || h.mcp?.openwiki?.configured ? 'ok' : 'warn']);
       systems.push(['Scraper', h.mcp?.['scraper-media']?.configured || h.mcp?.firecrawl?.configured ? 'ok' : 'warn']);
       systems.push(['Playwright', h.mcp?.playwright?.mcpUrl ? 'ok' : 'warn']);
-      systems.push(['Obsidian', h.mind?.obsidian?.configured ? 'ok' : 'warn']);
+      systems.push(['Jan.ai', h.jan?.configured ? 'ok' : 'warn']);
+      systems.push(['Automation', h.automation?.configured ? 'ok' : 'warn']);
 
       $('#systemList').innerHTML = systems
         .map(
@@ -246,7 +241,7 @@
 
     addMessage(
       'assistant',
-      '**JARVIS online.** I code in every major language, build web and mobile apps, scrape and research the web, and run workflows 24/7. Speak or type a command.'
+      `**JARVIS online, ${window.tonyUserName()}.** I'm always listening — just talk, no mic click. Say **"Wake up Tony"** for your briefing. Tony Stark wit + Peter Parker heart. Marvel, Urdu novels, coding, automation — all yours.`
     );
   }
 
@@ -262,5 +257,7 @@
         boot();
       }
     });
-  } else boot();
+  } else {
+    boot();
+  }
 })();

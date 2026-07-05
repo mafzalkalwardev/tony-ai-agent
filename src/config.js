@@ -49,6 +49,12 @@ module.exports = {
     model: env('DEEPGRAM_MODEL', 'nova-2'),
     baseUrl: env('DEEPGRAM_BASE_URL', 'https://api.deepgram.com/v1'),
   },
+  voice: {
+    minConfidence: Number(env('TONY_VOICE_MIN_CONFIDENCE', '0.55')),
+    noiseCancellation: env('TONY_VOICE_NOISE_CANCEL', 'true') === 'true',
+    highPassHz: Number(env('TONY_VOICE_HIGHPASS_HZ', '180')),
+    vadSpeechMult: Number(env('TONY_VOICE_VAD_MULT', '3.2')),
+  },
   elevenlabs: {
     apiKey: env('ELEVENLABS_API_KEY'),
     voiceId: env('ELEVENLABS_VOICE_ID', '21m00Tcm4TlvDq8ikWAM'),
@@ -122,7 +128,36 @@ module.exports = {
     path: env('TONY_DESKTOP_PATH', ''),
     enabled: env('TONY_DESKTOP_ENABLED', 'true') === 'true',
   },
+  selfHeal: {
+    enabled: env('TONY_SELF_HEAL', 'true') === 'true',
+    maxRetries: Number(env('TONY_SELF_HEAL_RETRIES', '1')),
+  },
   shellUnsafe: env('TONY_SHELL_UNSAFE', 'false') === 'true',
+  companion: {
+    enabled: env('TONY_COMPANION_MODE', 'true') === 'true',
+    userName: env('TONY_USER_NAME', 'Muhammad Afzal'),
+    wakePhrases: env('TONY_WAKE_PHRASES', '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    useLlmGreeting: env('TONY_COMPANION_LLM_GREETING', 'true') === 'true',
+    autoEmpathy: env('TONY_COMPANION_EMPATHY', 'true') === 'true',
+    alwaysListen: env('TONY_ALWAYS_LISTEN', 'true') === 'true',
+  },
+  jan: {
+    enabled: env('JAN_ENABLED', 'true') === 'true',
+    baseUrl: env('JAN_API_URL', 'http://localhost:1337/v1'),
+    model: env('JAN_MODEL', ''),
+  },
+  automation: {
+    enabled: env('TONY_AUTOMATION_ENABLED', 'true') === 'true',
+  },
+  context: {
+    maxTokens: Number(env('TONY_MAX_CONTEXT_TOKENS', '100000')),
+    toolResultMaxChars: Number(env('TONY_TOOL_RESULT_MAX_CHARS', '4000')),
+    episodeMaxChars: Number(env('TONY_EPISODE_MAX_CHARS', '6000')),
+    historyTurns: Number(env('TONY_HISTORY_TURNS', '12')),
+  },
   identityPath: path.join(root, 'TONY.md'),
   skillsDirs: [
     path.join(root, 'skills'),

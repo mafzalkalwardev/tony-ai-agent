@@ -9,6 +9,7 @@ function createProvider(kind) {
   if (kind === 'groq') return require('./groq');
   if (kind === 'gemini') return require('./gemini');
   if (kind === 'ollama') return ollama;
+  if (kind === 'jan') return require('./jan');
   return require('./mock');
 }
 
@@ -27,6 +28,7 @@ function buildChain() {
   if (config.openai.apiKey && !chain.includes('openai')) chain.push('openai');
   if (config.anthropic.apiKey && !chain.includes('anthropic')) chain.push('anthropic');
   if (config.ollama.enabled) chain.push('ollama');
+  if (config.jan?.enabled) chain.push('jan');
 
   if (!chain.length) chain.push('mock');
   return [...new Set(chain)];
@@ -63,6 +65,10 @@ async function complete(messages, options = {}) {
     if (kind === 'ollama') {
       const avail = await ollama.isAvailable();
       if (!avail) continue;
+    }
+    if (kind === 'jan') {
+      const jan = require('./jan');
+      if (!(await jan.isAvailable())) continue;
     }
     if (kind !== 'mock' && kind !== 'ollama') {
       const cfg = config[kind];
@@ -102,6 +108,7 @@ function providerStatus() {
     groq: Boolean(config.groq.apiKey),
     openai: Boolean(config.openai.apiKey),
     ollama: config.ollama.enabled,
+    jan: config.jan?.enabled,
   };
 }
 

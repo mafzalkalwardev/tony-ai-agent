@@ -1,8 +1,8 @@
 # TONY — Unified Personal AI (One Project)
 
-**This is the one TONY.** Voice, workflows, goals, MCP, CodeGraph, web UI, and your original [tony-ai](https://github.com/mafzalkalwardev/tony-ai) desktop assistant — all in this repo.
+**This is the one TONY.** Voice, workflows, goals, MCP, CodeGraph, JARVIS web UI, companion mode, self-healing, and your original [tony-ai](https://github.com/mafzalkalwardev/tony-ai) desktop assistant — all in this repo.
 
-**TONY** (Tactical Omniscient Neural Yielder) is a self-hosted autonomous AI for your laptop: **Groq brain**, **Deepgram + ElevenLabs voice**, **automated workflows**, **graphify**, **Obsidian brain**, **Paul builder**, and **Charlie OS** runtime.
+**TONY** (Tactical Omniscient Neural Yielder) is a self-hosted autonomous AI for your laptop: multi-provider LLM brain, **Deepgram + ElevenLabs voice**, **companion wake mode**, **goal-driven execution**, **graphify + Obsidian brain**, **Paul builder**, **Charlie OS** runtime, and **52+ agent tools**.
 
 | Source | Pattern adopted |
 |--------|-----------------|
@@ -13,113 +13,143 @@
 | [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) | Goal decomposition + tool loops |
 | Architectures of Mind | 7-layer cognitive stack: perception → obsidian |
 
-## Quick start (Charlie OS)
+## Quick start
 
 ```powershell
 Set-Location "D:\TONY AI AGENT"
 Copy-Item .env.example .env
-# Add GROQ_API_KEY, DEEPGRAM_API_KEY, ELEVENLABS_API_KEY
+# Add GROQ_API_KEY (or use Ollama/Jan offline), DEEPGRAM_API_KEY, ELEVENLABS_API_KEY
 npm install
 npm test
 npm run charlie      # Boot graph + gateway locally
 npm run chat         # Interactive CLI
 ```
 
-## Stack
-
-| Layer | Provider | Env |
-|-------|----------|-----|
-| Brain | Groq | `GROQ_API_KEY`, `TONY_LLM_PROVIDER=groq` |
-| STT | Deepgram | `DEEPGRAM_API_KEY` |
-| TTS | ElevenLabs | `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` |
-| Graph | graphify | `data/graphify.json` (auto-built) |
-| Vault | Obsidian | `OBSIDIAN_VAULT_PATH=./vault` |
-| Builder | Paul | `POST /api/agents/paul/build` |
-| Runtime | Charlie OS | `npm run charlie` |
-| MCP | Perplexity, Firecrawl, QuickBooks, Higgsfield, Playwright | See `.env.example` |
-| Goals | Loop until success criteria met | `goal_run` tool, `POST /api/goals/run` |
-
-### Playwright MCP (free, local — no API key)
-
-Per [Playwright MCP docs](https://playwright.dev/docs/getting-started-mcp):
+### Optional Python (desktop automation)
 
 ```powershell
-npm run playwright:mcp    # Terminal 1 — starts @playwright/mcp on :8931
-npm run test:live           # Terminal 2 — full live test
+pip install -r requirements.txt
 ```
 
-Set `PLAYWRIGHT_MCP_URL=http://localhost:8931/mcp` (default). Uses JSON-RPC over HTTP per [microsoft/playwright-mcp](https://github.com/microsoft/playwright-mcp).
+Enables `desktop_automate` (mouse, keyboard, screenshots) and `presentation_create` (PowerPoint). Set `TONY_AUTOMATION_ENABLED=true` in `.env`.
 
-### Local-first mode (`TONY_LOCAL_FIRST=true`)
+For browser automation (signup, API keys, forms): `npm run playwright:mcp` then ask TONY to automate — CAPTCHAs pause for you to solve manually.
 
-When Perplexity/QuickBooks/Higgsfield keys are missing, TONY falls back to:
-- **graphify** + integration repos + Obsidian (free)
-- **Firecrawl** or **fetch** for web content
-- **Playwright MCP** for browser (free local)
-- **Groq → OpenAI** LLM fallback on rate limits
+## What TONY can do
 
+### Core agent
 
-```powershell
-npm run integrations:init    # Clone 12 GitHub repos locally
-npm run integrations:status
-```
+- **ReAct loop** — Understand → Plan → Execute → Integrate → Reflect (`TONY_AUTO_REFLECT`)
+- **52+ tools** — Filesystem, shell, memory, graph, MCP, goals, tasks, CodeGraph, SignalMint, GitHub
+- **Skills** — 20+ built-in skills (superpowers, ponytail, impeccable-design, companion-wake, error-recovery, …)
+- **Crew routing** — Researcher, Engineer, Operator, Strategist for multi-agent tasks
+- **Paul builder** — Local integration builder agent (`paul_build`, `POST /api/agents/paul/build`)
 
-**MCP tools:** `perplexity_search`, `firecrawl_scrape`, `quickbooks_query`, `higgsfield_generate`, `playwright_snapshot`, `deep_research`
+### LLM providers (auto-fallback chain)
 
-**Goal-driven:** Create goals with success criteria — TONY loops until `test:npm test`, `file exists:`, or LLM verification passes.
+| Provider | Env | Notes |
+|----------|-----|-------|
+| `groq` | `GROQ_API_KEY`, `GROQ_MODEL` | Default fast cloud brain |
+| `gemini` | `GOOGLE_AI_API_KEY`, `GEMINI_MODEL` | Google AI Studio |
+| `openai` | `OPENAI_API_KEY`, `OPENAI_MODEL` | Fallback on rate limits |
+| `anthropic` | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Claude |
+| `ollama` | `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | Fully local offline |
+| `jan` | `JAN_API_URL` (localhost:1337) | Jan.ai OpenAI-compatible API |
+| `mock` | No key | Pattern-matching for tests |
 
-**Skills:** impeccable-design, ponytail, superpowers, goal-driven, research-multi
+Set `TONY_LLM_PROVIDER` in `.env`. Offline mode (`TONY_OFFLINE_AUTO`) falls back to Ollama/Jan/mock when network is down.
 
-**Context:** `context/CLAUDE.md`, `context/AGENTS.md`, karpathy guidelines, subconscious, enterprise hardening
+### Voice & JARVIS UI
 
-**Bundled repos:** superpowers, awesome-claude-code, claude-squad, karpathy-guidelines, claude-subconscious, playwright-mcp, tdd-guardian, wshobson-agents, repomix, everything-claude-code, ponytail, impeccable, **tony-ai** (original desktop assistant)
-
-## JARVIS Desktop UI (Iron Man HUD)
-
-The **default UI** is now the JARVIS desktop experience — arc reactor, neural graph lines, cyan HUD:
+- **STT** — Deepgram Nova (`DEEPGRAM_API_KEY`)
+- **TTS** — ElevenLabs (`ELEVENLABS_API_KEY`)
+- **Noise cancellation** — Filters fan/background noise (`TONY_VOICE_NOISE_CANCEL`)
+- **Always-on listen** — No mic click required (`TONY_ALWAYS_LISTEN`)
+- **JARVIS HUD** — Arc reactor UI at `http://localhost:8787/jarvis`
 
 ```powershell
 npm run charlie          # starts gateway
-npm run desktop          # opens JARVIS in Edge/Chrome app window (no browser tabs)
+npm run desktop          # opens JARVIS in Edge/Chrome app window
 ```
 
-Open manually: `http://localhost:8787/jarvis`
+### Companion mode
 
-### 24/7 continuous operation
+Say **"Wake up Tony"** (or Urdu: *utho Tony*) for:
+
+- Time-based greeting + genuine praise
+- Work briefing (goals, tasks done vs remaining)
+- Mood-aware tone: best friend, caring partner, protective brother
+- Automatic habit learning (wake times, topics, moods)
+
+Set `TONY_COMPANION_MODE=true`, `TONY_USER_NAME`, and optional `TONY_WAKE_PHRASES` in `.env`.
+
+### Memory & learning
+
+| Layer | Store | Purpose |
+|-------|-------|---------|
+| Perception | Deepgram | Speech → text |
+| Working | Session | Current context |
+| Episodic | SQLite | Conversation history |
+| Semantic | JSON | Facts and preferences |
+| Procedural | JSON | Playbooks |
+| Graph | graphify | File/concept relationships |
+| Obsidian | `vault/` | Human-readable external brain |
+
+- **User profile** — Learns name, interests from conversation (`user_profile_*` tools)
+- **Error memory** — Stores fixes from failures (`error_log`, `error_learn`)
+- **Self-healing** — Auto-retry with corrected args (`TONY_SELF_HEAL`, `self_heal` tool)
+- **Reflexion** — Analyzes failures and proposes fixes before retry
+
+### Goals, tasks & workflows
+
+- **Goal-driven** — Create goals with success criteria; TONY loops until `test:npm test`, `file exists:`, or LLM verification passes
+- **Task recorder** — Replay workflows offline (`repeat <name>`)
+- **Workflow runner** — Auto-picks goal vs crew vs standard mode
+
+### Integrations & MCP
 
 ```powershell
-npm run mcp:stack        # Playwright + optional MCP servers
-npm run tony:daemon      # Gateway watchdog + goal ticks + hourly graph rebuild
+npm run integrations:init    # Clone 21 GitHub repos locally
+npm run integrations:status
+npm run playwright:mcp       # Free local browser MCP on :8931
+npm run mcp:stack            # Playwright + optional MCP servers
 ```
-
-Set `TONY_DAEMON_ENABLED=true` in `.env` to auto-start daemon with Charlie.
-
-### New MCP integrations
 
 | MCP | Purpose | Env |
 |-----|---------|-----|
-| OpenWiki | Repo docs for coding agents | `OPENWIKI_MCP_URL` |
-| Scraper Media | LLM-optimized web scrape | `SCRAPER_MEDIA_MCP_URL` |
+| Perplexity | Web research | `PERPLEXITY_API_KEY` |
+| Firecrawl | Scrape / search | `FIRECRAWL_API_KEY` |
+| QuickBooks | Accounting queries | `QUICKBOOKS_*` |
+| Higgsfield | Image generation | `HIGGSFIELD_API_KEY` |
+| Playwright | Browser automation | `PLAYWRIGHT_MCP_URL` (free, local) |
+| OpenWiki | Repo docs for agents | `OPENWIKI_MCP_URL` |
+| Scraper Media | LLM-optimized scrape | `SCRAPER_MEDIA_MCP_URL` |
 | Motiongraph | HUD / motion graphics | `MOTIONGRAPH_MCP_URL` |
-| obsidian-skills | Canvas, bases, vault CLI | `npm run integrations:init` |
+| Obsidian Skills | Canvas, vault CLI | via `integrations:init` |
 
-Tools: `openwiki_search`, `scraper_media_scrape`, `motiongraph_aesthetic`, `obsidian_create_canvas`, `fullstack_scaffold`, `mcp_call`
+**Local-first** (`TONY_LOCAL_FIRST=true`): When paid keys are missing, TONY falls back to graphify, Obsidian, fetch, Playwright MCP, and local repos.
 
+**SignalMint** — SMS campaigns, contacts, compliance (`SIGNALMINT_*` env vars).
 
-Your first repo [tony-ai](https://github.com/mafzalkalwardev/tony-ai) is now bundled:
+**CodeGraph** — Structural code intelligence (`codegraph_*` tools, `npm run codegraph:index`).
+
+### Desktop bridges
+
+- **tony-ai** — Original PyQt6 voice assistant (`npm run integrations:init` → `integrations/repos/tony-ai`)
+- **Desktop automation** — pyautogui click/type/hotkey/screenshot (`desktop_automate`)
+- **Presentations** — PowerPoint `.pptx` generation (`presentation_create`, `pip install python-pptx`)
+- **Realtime playbooks** — Browser signup, API keys, CAPTCHA pause-and-continue (`skills/realtime-automation`)
+- **Bridge tools** — `tony_desktop_status`, `tony_desktop_command`, `workflow_run`
+
+### 24/7 daemon
 
 ```powershell
-npm run integrations:init          # clones tony-ai + 16 other repos
-npm run codegraph:index            # index codebase for agent code intelligence
+npm run tony:daemon      # Gateway watchdog + goal ticks + hourly graph rebuild
 ```
 
-- **Web TONY** (this repo): Groq brain, Deepgram/ElevenLabs voice bar, workflows, MCP, goals
-- **Desktop tony-ai**: `python run_tony.py` in `integrations/repos/tony-ai` — free local voice, PyQt6 UI
-- **Bridge tools**: `tony_desktop_status`, `tony_desktop_command`, `workflow_run`, `codegraph_*`
+Set `TONY_DAEMON_ENABLED=true` in `.env` to auto-start with Charlie.
 
-See `context/tony-ai-integration.md` and `skills/tony-desktop/SKILL.md`.
-
-
+## CLI commands
 
 ```bash
 npm run chat                    # Interactive session
@@ -130,12 +160,14 @@ npm run charlie                 # Boot Charlie OS + gateway
 npm run charlie:status          # Status dashboard
 npm run graph                   # Rebuild knowledge graph
 npm run charlie:build -- "Wire voice endpoints"
+npm run test                    # Full agent test suite (mock LLM)
+npm run test:live               # Live test (needs API keys + Playwright MCP)
 ```
 
 ## HTTP API
 
 ```bash
-# Health (includes mind layers)
+# Health (mind layers, companion, voice, MCP, goals)
 curl http://localhost:8787/health
 
 # Chat (Bearer TONY_API_TOKEN)
@@ -144,7 +176,7 @@ curl -X POST http://localhost:8787/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message":"What is SignalMint?"}'
 
-# Voice converse (STT → Groq agent → TTS)
+# Voice converse (STT → agent → TTS)
 curl -X POST http://localhost:8787/api/voice/converse \
   -H "Authorization: Bearer $TONY_API_TOKEN" \
   -H "Content-Type: application/json" \
@@ -155,6 +187,12 @@ curl -X POST http://localhost:8787/api/agents/paul/build \
   -H "Authorization: Bearer $TONY_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"task":"Run tests and report status"}'
+
+# Goals
+curl -X POST http://localhost:8787/api/goals/run \
+  -H "Authorization: Bearer $TONY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"goalId":"..."}'
 
 # Graph query
 curl "http://localhost:8787/api/brain/graph/query?q=voice&token=$TONY_API_TOKEN"
@@ -168,41 +206,41 @@ curl "http://localhost:8787/api/brain/graph/query?q=voice&token=$TONY_API_TOKEN"
 ```
 D:\TONY AI AGENT\
 ├── src/
-│   ├── core/        agent loop, planner, crew
-│   ├── llm/         Groq, OpenAI, Anthropic, mock
-│   ├── voice/       Deepgram STT, ElevenLabs TTS
-│   ├── brain/       graphify, obsidian, architectures-of-mind
+│   ├── core/        agent loop, planner, crew, reflexion
+│   ├── llm/         Groq, Gemini, OpenAI, Anthropic, Ollama, Jan, mock
+│   ├── voice/       Deepgram STT, ElevenLabs TTS, noise filter
+│   ├── companion/   wake phrases, habits, mood, persona, briefing
+│   ├── brain/       graphify, obsidian, codegraph, architectures-of-mind
 │   ├── agents/      Paul builder
 │   ├── charlie-os/  local runtime shell
-│   ├── memory/      episodic, semantic, procedural
-│   ├── tools/       filesystem, graph, obsidian, paul, ...
+│   ├── memory/      episodic, semantic, procedural, profile, errors
+│   ├── tools/       52+ registered agent tools
 │   ├── gateway/     Express + WebSocket + voice endpoints
+│   ├── bridge/      tony-desktop, pyautogui automation
+│   ├── mcp/         Perplexity, Firecrawl, Playwright, OpenWiki, …
 │   └── knowledge/   curated agent patterns index
+├── public/          JARVIS HUD (jarvis.html, voice.js, tony-api.js)
 ├── vault/           Obsidian agentic brain (markdown)
 ├── skills/          built-in + user skills
+├── scripts/         tests, automation bridge, MCP stack
+├── requirements.txt Python deps for desktop automation
 └── data/            memory DB + graphify graph (gitignored)
 ```
 
-## Architectures of Mind
+## Configuration
 
-| Layer | Store | Purpose |
-|-------|-------|---------|
-| Perception | Deepgram | Speech → text |
-| Working | Session | Current context |
-| Episodic | SQLite | Conversation history |
-| Semantic | JSON | Facts and preferences |
-| Procedural | JSON | Playbooks |
-| Graph | graphify | File/concept relationships |
-| Obsidian | vault/ | Human-readable external brain |
+Copy `.env.example` → `.env`. Key groups:
 
-## LLM providers
+| Group | Variables |
+|-------|-----------|
+| LLM | `TONY_LLM_PROVIDER`, `GROQ_API_KEY`, `GOOGLE_AI_API_KEY`, `OLLAMA_*`, `JAN_*` |
+| Voice | `DEEPGRAM_API_KEY`, `ELEVENLABS_*`, `TONY_VOICE_*`, `TONY_ALWAYS_LISTEN` |
+| Companion | `TONY_COMPANION_MODE`, `TONY_USER_NAME`, `TONY_WAKE_PHRASES` |
+| Agent | `TONY_MAX_ITERATIONS`, `TONY_AUTO_REFLECT`, `TONY_SELF_HEAL`, `TONY_GOAL_*` |
+| Security | `TONY_API_TOKEN`, `TONY_SHELL_UNSAFE` (dev only) |
+| Offline | `TONY_OFFLINE_AUTO`, `TONY_OFFLINE_FORCE`, `TONY_LOCAL_FIRST` |
 
-| Provider | Env |
-|----------|-----|
-| `groq` | `GROQ_API_KEY`, `GROQ_MODEL` (default brain) |
-| `mock` | No key — pattern-matching for tests |
-| `openai` | `OPENAI_API_KEY`, `OPENAI_MODEL` |
-| `anthropic` | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` |
+See `TONY.md` for persona, operating loop, and identity.
 
 ## Docker
 

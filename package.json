@@ -1,7 +1,7 @@
 {
   "name": "tony-agent",
-  "version": "2.5.0",
-  "description": "TONY — Groq brain, MCP integrations, goal-driven agent, graphify, Obsidian brain, Charlie OS",
+  "version": "2.7.0",
+  "description": "TONY — multi-LLM agent, JARVIS voice UI, realtime laptop automation, companion mode, self-healing, MCP, goals",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
