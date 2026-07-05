@@ -83,6 +83,14 @@ app.post('/api/chat', auth, async (req, res) => {
   }
 });
 
+app.get('/api/screenshots/:name', auth, (req, res) => {
+  const { resolveScreenshotFile } = require('./attachments');
+  const file = resolveScreenshotFile(req.params.name);
+  if (!file) return res.status(404).json({ error: 'Screenshot not found' });
+  res.type('image/png');
+  res.sendFile(file);
+});
+
 app.get('/api/memory/search', auth, (req, res) => {
   const q = req.query.q || '';
   res.json(memory.searchAll(q));

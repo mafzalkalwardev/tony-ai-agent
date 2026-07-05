@@ -16,7 +16,7 @@
   window.tonyUserName = () => window.__tonyUserName || 'Muhammad Afzal';
   window.tonyAddMessage = addMessage;
 
-  function addMessage(role, content, tools) {
+  function addMessage(role, content, tools, attachments) {
     const el = document.createElement('div');
     el.className = `msg ${role}`;
     el.innerHTML = role === 'assistant' ? simpleMd(content) : content;
@@ -25,6 +25,9 @@
       t.className = 'msg-tools';
       t.textContent = `[${tools.join(', ')}]`;
       el.appendChild(t);
+    }
+    if (role === 'assistant' && attachments?.length) {
+      window.tonyRenderAttachments?.(el, attachments, () => token);
     }
     $('#messages').appendChild(el);
     el.scrollIntoView({ behavior: 'smooth' });
@@ -173,7 +176,12 @@
       thinking.remove();
       sessionId = result.sessionId || sessionId;
       localStorage.setItem(SESSION_KEY, sessionId);
-      addMessage('assistant', result.response || '(no response)', result.toolResults?.map((t) => t.tool));
+      addMessage(
+        'assistant',
+        result.response || '(no response)',
+        result.toolResults?.map((t) => t.tool),
+        window.tonyResolveAttachments?.(result)
+      );
       if (window.tonyVoice?.Voice?.voiceOut) window.tonyVoice.speakResponse(result.response);
     } catch (e) {
       thinking.remove();
@@ -230,7 +238,12 @@
           sessionId,
         }),
       });
-      addMessage('assistant', result.response, result.toolResults?.map((t) => t.tool));
+      addMessage(
+        'assistant',
+        result.response,
+        result.toolResults?.map((t) => t.tool),
+        window.tonyResolveAttachments?.(result)
+      );
     });
 
     $('#rebuildGraph')?.addEventListener('click', async () => {

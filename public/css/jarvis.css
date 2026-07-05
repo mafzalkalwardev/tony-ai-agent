@@ -252,6 +252,83 @@ body {
 .msg.user { align-self: flex-end; background: rgba(0, 136, 255, 0.15); border: 1px solid rgba(0, 136, 255, 0.3); }
 .msg.assistant { align-self: flex-start; border-left: 2px solid var(--cyan); background: rgba(0, 229, 255, 0.06); }
 
+.msg-attachments {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.msg-screenshot {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 10, 20, 0.6);
+  max-width: 100%;
+}
+
+.msg-screenshot img {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  cursor: zoom-in;
+  background: #000;
+}
+
+.msg-screenshot figcaption {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+  border-top: 1px solid var(--line);
+}
+
+.msg-screenshot-error .msg-screenshot-fallback {
+  display: block;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.tony-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 4, 12, 0.92);
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  cursor: zoom-out;
+}
+
+.tony-lightbox.open {
+  display: flex;
+}
+
+.tony-lightbox img {
+  max-width: 95vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 40px var(--glow);
+}
+
+.tony-lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  font-size: 2rem;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  color: var(--cyan);
+  cursor: pointer;
+}
+
 .hud-composer {
   display: flex;
   gap: 0.5rem;

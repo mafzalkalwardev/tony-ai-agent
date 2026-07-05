@@ -321,6 +321,7 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
     response: finalContent,
     plan: planResult,
     toolResults,
+    attachments: require('../gateway/attachments').extractAttachments(toolResults),
     iterations,
     provider,
     online,

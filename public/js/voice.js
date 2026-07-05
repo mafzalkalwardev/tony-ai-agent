@@ -528,7 +528,8 @@
     window.tonyAddMessage?.(
       'assistant',
       result.response || '(no response)',
-      result.toolResults?.map((t) => t.tool)
+      result.toolResults?.map((t) => t.tool),
+      window.tonyResolveAttachments?.(result)
     );
 
     if (Voice.voiceOut) await speakResponse(result.response);

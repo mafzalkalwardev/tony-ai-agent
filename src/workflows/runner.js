@@ -9,6 +9,7 @@ const { runCrew } = require('../core/crew');
 const goalRunner = require('../goals/runner');
 const goalStore = require('../goals/store');
 const taskStore = require('../tasks/store');
+const { extractAttachments } = require('../gateway/attachments');
 
 function pickMode(task, { mode = 'auto' } = {}) {
   if (mode !== 'auto') return mode;
@@ -110,6 +111,7 @@ async function runWorkflow({
     sessionId,
     response: result.response,
     toolResults: result.toolResults,
+    attachments: result.attachments || extractAttachments(result.toolResults),
     voice,
     details: result.goal || result.crew || undefined,
   };

@@ -49,6 +49,11 @@ async function main() {
   assert('voice noise filter', voiceFilter.isLikelyNoiseTranscript('hmm', 0.9).noise === true);
   assert('voice keeps speech', voiceFilter.isLikelyNoiseTranscript('wake up Tony', 0.8).noise === false);
 
+  const attachments = require('../src/gateway/attachments');
+  assert('attachment extract', attachments.extractAttachments([
+    { tool: 'desktop_automate', result: { ok: true, action: 'screenshot', path: 'data/screenshots/screenshot-20260704-120000.png', width: 1920, height: 1080 } },
+  ]).length === 1);
+
   const ctx = require('../src/llm/context-budget');
   const huge = { ok: true, imageBase64: 'A'.repeat(50000) };
   const safe = ctx.sanitizeToolResult(huge);
