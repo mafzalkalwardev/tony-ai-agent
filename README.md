@@ -1,17 +1,70 @@
-# TONY — Unified Personal AI (One Project)
+<div align="center">
 
-**This is the one TONY.** Voice, workflows, goals, MCP, CodeGraph, JARVIS web UI, companion mode, self-healing, and your original [tony-ai](https://github.com/mafzalkalwardev/tony-ai) desktop assistant — all in this repo.
+# TONY AI Agent
 
-**TONY** (Tactical Omniscient Neural Yielder) is a self-hosted autonomous AI for your laptop: multi-provider LLM brain, **Deepgram + ElevenLabs voice**, **companion wake mode**, **goal-driven execution**, **graphify + Obsidian brain**, **Paul builder**, **Charlie OS** runtime, and **52+ agent tools**.
+<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=700&size=28&duration=2800&pause=700&color=7C3AED&center=true&vCenter=true&width=900&lines=Groq+Brain+%2B+Realtime+Voice;Deepgram+%2F+ElevenLabs+Speech;Graphify+%2B+Obsidian+Agentic+Memory;Modern+agent+orchestration" alt="Typing SVG" />
 
-| Source | Pattern adopted |
-|--------|-----------------|
-| [Microsoft JARVIS / HuggingGPT](https://github.com/microsoft/JARVIS) | 4-stage pipeline: plan → select → execute → synthesize |
-| [OpenClaw](https://github.com/openclaw/openclaw) | Gateway, skills workspace, session model, local-first |
-| [CrewAI](https://github.com/joaomdmoura/crewAI) | Role-based specialist routing (+ Paul builder) |
-| [LangGraph](https://github.com/langchain-ai/langgraph) | Stateful multi-step graphs with checkpoints |
-| [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) | Goal decomposition + tool loops |
-| Architectures of Mind | 7-layer cognitive stack: perception → obsidian |
+<p>
+  <img src="https://komarev.com/ghpvc/?username=mafzalkalwardev&label=Project%20Views&color=7c3aed&style=for-the-badge" alt="Project views" />
+  <img src="https://img.shields.io/github/stars/mafzalkalwardev/tony-ai-agent?style=for-the-badge&color=22c55e" alt="GitHub stars" />
+  <img src="https://img.shields.io/github/forks/mafzalkalwardev/tony-ai-agent?style=for-the-badge&color=f59e0b" alt="GitHub forks" />
+  <img src="https://img.shields.io/github/license/mafzalkalwardev/tony-ai-agent?style=for-the-badge&color=64748b" alt="License" />
+</p>
+
+<p>
+  <img src="https://skillicons.dev/icons?i=js,nodejs,react" alt="Skill icons" />
+</p>
+
+<p>
+  <strong>TONY agent stack with Groq brain, Deepgram/ElevenLabs voice, graphify knowledge, and Obsidian-style agentic memory.</strong>
+</p>
+
+</div>
+
+---
+
+## Trophy Cards
+
+<div align="center">
+  <img src="https://github-profile-trophy.vercel.app/?username=mafzalkalwardev&theme=algolia&no-frame=true&no-bg=true&margin-w=12&margin-h=12&column=4" alt="GitHub trophy cards" />
+</div>
+
+---
+
+## Stats Cards
+
+<div align="center">
+  <img height="165" src="https://github-readme-stats-sigma-five.vercel.app/api?username=mafzalkalwardev&show_icons=true&theme=tokyonight&hide_border=true&rank_icon=github" alt="GitHub stats" />
+  <img height="165" src="https://github-readme-stats-sigma-five.vercel.app/api/top-langs/?username=mafzalkalwardev&layout=compact&theme=tokyonight&hide_border=true" alt="Top languages" />
+</div>
+
+---
+
+## Activity Graph
+
+<div align="center">
+  <img src="https://github-readme-activity-graph.vercel.app/graph?username=mafzalkalwardev&theme=react-dark&hide_border=true&area=true" alt="GitHub activity graph" />
+</div>
+
+---
+
+## Contribution Snake
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mafzalkalwardev/google-voice-dispatch-agent/output/github-contribution-grid-snake-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mafzalkalwardev/google-voice-dispatch-agent/output/github-contribution-grid-snake.svg">
+    <img alt="Contribution snake" src="https://raw.githubusercontent.com/mafzalkalwardev/google-voice-dispatch-agent/output/github-contribution-grid-snake.svg">
+  </picture>
+</div>
+
+---
+
+## SEO Keywords
+
+`Groq agent` `Deepgram` `ElevenLabs` `Obsidian agent`
+
+---
 
 ## Quick start
 
