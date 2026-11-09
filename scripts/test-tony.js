@@ -157,6 +157,26 @@ async function main() {
   const localStt = require('../src/voice/local_stt');
   assert('local stt status', localStt.status().configured === true);
 
+  const trusted = require('../src/safety/trusted_mode');
+  trusted.disable();
+  assert('trusted off default', trusted.isEnabled() === false);
+  trusted.enable({ by: 'test' });
+  assert('trusted on', trusted.isEnabled() === true);
+  assert('trusted auto shell', trusted.canAutoApprove('shell', 'npm install') === true);
+  assert(
+    'trusted still respects block via policy',
+    require('../src/safety/policy').canRunCommand('rm -rf /', { approved: true }).allowed === false
+  );
+  trusted.disable();
+
+  const decide = require('../src/core/decision_engine');
+  assert('decision analyze', decide.analyze('deploy production').risk === 'high');
+  assert('intent trusted on', intentRouter.route('Tony trusted mode on').intent === 'trusted_mode_on');
+  assert('intent research', intentRouter.route('Tony research groq models').intent === 'research_web');
+
+  const research = require('../src/tools/research_web');
+  assert('research strip html', research.stripHtml('<b>hi</b> there').includes('hi'));
+
   const scanner = require('../src/tools/project_scanner');
   const scan = scanner.scan('.');
   assert('project scanner type', Boolean(scan.projectType));

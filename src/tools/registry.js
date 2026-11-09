@@ -826,26 +826,63 @@ const builtins = {
   desktop_automate: {
     name: 'desktop_automate',
     description:
-      'Windows desktop automation via pyautogui — click, type, hotkey, screenshot, move mouse. Use for realtime laptop tasks, opening apps, form filling on native UI.',
+      'Full laptop control via pyautogui — click, doubleclick, type, press, hotkey, scroll, drag, move, screenshot, multi-step sequence. Use for realtime desktop takeover.',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['click', 'type', 'hotkey', 'screenshot', 'move', 'position'],
+          enum: [
+            'click',
+            'doubleclick',
+            'type',
+            'press',
+            'hotkey',
+            'screenshot',
+            'move',
+            'position',
+            'scroll',
+            'drag',
+            'sequence',
+          ],
         },
         x: { type: 'number' },
         y: { type: 'number' },
+        x2: { type: 'number' },
+        y2: { type: 'number' },
         text: { type: 'string' },
+        key: { type: 'string' },
         keys: { type: 'array', items: { type: 'string' } },
+        clicks: { type: 'number' },
         duration: { type: 'number' },
+        steps: { type: 'array', items: { type: 'object' } },
+        approved: { type: 'boolean' },
       },
       required: ['action'],
     },
     async execute(payload) {
       const automation = require('../bridge/automation');
-      if (!require('../config').automation?.enabled) {
+      const cfg = require('../config');
+      if (!cfg.automation?.enabled) {
         return { ok: false, error: 'Desktop automation disabled — set TONY_AUTOMATION_ENABLED=true' };
+      }
+      const trusted = require('../safety/trusted_mode');
+      if (
+        !payload.approved &&
+        !trusted.canAutoApprove('desktop_automate', payload.action) &&
+        ['click', 'type', 'hotkey', 'press', 'drag', 'sequence'].includes(payload.action)
+      ) {
+        const pending = require('../safety/approvals').create({
+          action: 'desktop_automate',
+          command: payload.action,
+          reason: 'Desktop control requires approval or Trusted Operator Mode',
+        });
+        return {
+          ok: false,
+          needsApproval: true,
+          pendingApprovalId: pending.id,
+          error: 'Approve desktop control or say: Tony trusted mode on',
+        };
       }
       return automation.run(payload);
     },
@@ -1179,7 +1216,8 @@ builtins.search_web = {
     required: ['query'],
   },
   async execute({ query, open = true, approved = false } = {}) {
-    if (!approved) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('search_web', query)) {
       const pending = require('../safety/approvals').create({
         action: 'search_web',
         command: query,
@@ -1190,7 +1228,7 @@ builtins.search_web = {
         level: 'NEEDS_APPROVAL',
         needsApproval: true,
         pendingApprovalId: pending.id,
-        error: 'Approve browser search first (yes/haan).',
+        error: 'Approve browser search first (yes/haan), or enable Trusted Operator Mode.',
         previewUrl: require('./web_search').buildSearchUrl(query),
       };
     }
@@ -1318,6 +1356,145 @@ builtins.local_stt_status = {
   parameters: { type: 'object', properties: {} },
   async execute() {
     return { ok: true, ...require('../voice/local_stt').status() };
+  },
+};
+
+builtins.trusted_mode = {
+  name: 'trusted_mode',
+  description:
+    'Enable/disable Trusted Operator Mode. When ON, TONY auto-approves research, desktop control, installs, builds, git write — hard blocks (secrets/rm -rf/payments/voice-clone) remain.',
+  parameters: {
+    type: 'object',
+    properties: {
+      enabled: { type: 'boolean' },
+      action: { type: 'string', enum: ['status', 'on', 'off'] },
+    },
+  },
+  async execute({ enabled, action = 'status' } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (action === 'on' || enabled === true) return { ok: true, ...trusted.enable({ by: 'tool' }) };
+    if (action === 'off' || enabled === false) return { ok: true, ...trusted.disable() };
+    return { ok: true, ...trusted.status() };
+  },
+};
+
+builtins.research_web = {
+  name: 'research_web',
+  description:
+    'Full-web research on any topic: multi-engine links + fetch public pages. Can open browser. Use for deep research across any websites.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      urls: { type: 'array', items: { type: 'string' } },
+      openBrowser: { type: 'boolean' },
+    },
+    required: ['query'],
+  },
+  async execute({ query, urls = [], openBrowser } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    const cfg = require('../config');
+    const open = openBrowser ?? (trusted.isEnabled() || cfg.research?.openBrowserOnResearch);
+    if (!trusted.canAutoApprove('research_web', query) && !trusted.isEnabled()) {
+      const pending = require('../safety/approvals').create({
+        action: 'research_web',
+        command: query,
+        reason: 'Broad web research/browser open — approve or enable trusted mode',
+      });
+      return {
+        ok: false,
+        needsApproval: true,
+        pendingApprovalId: pending.id,
+        preview: require('./web_search').buildSearchUrl(query),
+        error: 'Approve research or say: Tony trusted mode on',
+      };
+    }
+    return require('./research_web').researchTopic(query, { openBrowser: open, urls });
+  },
+};
+
+builtins.browse_site = {
+  name: 'browse_site',
+  description: 'Open and/or fetch ANY public http(s) website for research',
+  parameters: {
+    type: 'object',
+    properties: {
+      url: { type: 'string' },
+      open: { type: 'boolean', default: true },
+      approved: { type: 'boolean' },
+    },
+    required: ['url'],
+  },
+  async execute({ url, open = true, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('browse_site', url)) {
+      const pending = require('../safety/approvals').create({
+        action: 'browse_site',
+        command: url,
+        reason: 'Opening external site requires approval or trusted mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('./research_web').browseSite(url, { open });
+  },
+};
+
+builtins.decide_action = {
+  name: 'decide_action',
+  description:
+    'Analyze a big/risky decision. In Trusted Mode, recommends and authorizes proceeding. Otherwise creates approval.',
+  parameters: {
+    type: 'object',
+    properties: {
+      message: { type: 'string' },
+      intent: { type: 'string' },
+    },
+    required: ['message'],
+  },
+  async execute({ message, intent = 'unknown' }, sessionId) {
+    const engine = require('../core/decision_engine');
+    return engine.decideAndMaybeExecute({
+      message,
+      intent: { intent },
+      sessionId,
+    });
+  },
+};
+
+builtins.laptop_control = {
+  name: 'laptop_control',
+  description:
+    'High-level laptop takeover helper: screenshot, open app, type text, hotkey chord, or run a step sequence.',
+  parameters: {
+    type: 'object',
+    properties: {
+      goal: { type: 'string' },
+      steps: { type: 'array', items: { type: 'object' } },
+      approved: { type: 'boolean' },
+    },
+    required: ['goal'],
+  },
+  async execute({ goal, steps = [], approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('laptop_control', goal)) {
+      const pending = require('../safety/approvals').create({
+        action: 'laptop_control',
+        command: goal,
+        reason: 'Laptop takeover requires approval or Trusted Operator Mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    const automation = require('../bridge/automation');
+    if (!steps.length) {
+      const shot = automation.run({ action: 'screenshot' });
+      return {
+        ok: true,
+        goal,
+        note: 'No steps provided — captured screenshot. Provide steps for click/type/hotkey sequence.',
+        screenshot: shot,
+      };
+    }
+    return automation.run({ action: 'sequence', steps });
   },
 };
 

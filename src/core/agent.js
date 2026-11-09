@@ -108,7 +108,11 @@ For codebase questions, use codegraph_context or codegraph_search before editing
 For local Windows desktop ops, use desktop_automate (pyautogui) for click/type/hotkey/screenshot, presentation_create for PowerPoint, mcp_call (playwright) for browser signup/API keys, or tony_desktop_status + tony_desktop_command if Python tony-ai is installed.
 For realtime tasks (presentations, accounts, API keys, screen control): follow realtime-automation skill — snapshot first, act in small steps, pause at CAPTCHA for user to solve.
 Use user_profile_get / user_profile_update to remember personal details about ${config.companion.userName}.
-Use write_file + shell (with user approval for git push/commit) to implement code changes.
+Use write_file + shell (with user approval for git push/commit unless Trusted Operator Mode is ON) to implement code changes.
+When Trusted Operator Mode is ON: auto-approve research on ANY public website, desktop/laptop control, installs, builds, tests, git write. Still NEVER read/write secrets (.env/tokens), never rm -rf, never voice-clone, never complete payments.
+Use research_web / browse_site / perplexity_search / firecrawl_scrape / playwright tools for full-web research.
+Use desktop_automate / laptop_control / open_app for full laptop control (click/type/scroll/drag/hotkeys/sequences).
+For big risky choices use decide_action — in trusted mode take the decision and execute; otherwise ask once.
 When a tool fails, analyze the error, apply a fix, and retry — do not repeat the same failing call unchanged.
 Use error_learn to save fixes that worked. Use self_heal on persistent failures.
 When user asks to repeat something, use task_replay or match recorded tasks.
@@ -205,27 +209,82 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
     safety.level === 'NEEDS_APPROVAL' &&
     ['run_tests', 'build_project', 'git_push', 'git_commit', 'github_pr', 'search_web'].includes(routed.intent)
   ) {
-    const pending = approvals.create({
-      action: routed.intent,
-      command: routed.params?.searchQuery || routed.normalized || message,
-      reason: safety.reason,
-      sessionId,
-      meta: { category: routed.category, params: routed.params || {} },
-    });
-    const response = `Approval needed for **${routed.intent}** (${safety.reason}).\nReply **yes** / **haan** to approve, or **no** / **nahi** to cancel.\nPending id: ${pending.id}`;
-    memory.appendEpisode(sessionId, 'assistant', response);
-    return {
-      sessionId,
-      response,
-      intent: routed,
-      safety,
-      approval: pending,
-      pendingApprovals: approvals.list('pending').slice(0, 5),
-      toolResults: [],
-      iterations: 0,
-      provider: 'local',
-      online: true,
-    };
+    const trusted = require('../safety/trusted_mode');
+    if (trusted.canAutoApprove(routed.intent, message)) {
+      // Trusted mode: fall through and execute instead of waiting.
+    } else {
+      const pending = approvals.create({
+        action: routed.intent,
+        command: routed.params?.searchQuery || routed.normalized || message,
+        reason: safety.reason,
+        sessionId,
+        meta: { category: routed.category, params: routed.params || {} },
+      });
+      const response = `Approval needed for **${routed.intent}** (${safety.reason}).\nReply **yes** / **haan**, or enable \`Tony trusted mode on\` for full autonomy.\nPending id: ${pending.id}`;
+      memory.appendEpisode(sessionId, 'assistant', response);
+      return {
+        sessionId,
+        response,
+        intent: routed,
+        safety,
+        approval: pending,
+        pendingApprovals: approvals.list('pending').slice(0, 5),
+        toolResults: [],
+        iterations: 0,
+        provider: 'local',
+        online: true,
+      };
+    }
+  }
+
+  // In trusted mode, auto-run common risky operator intents immediately.
+  if (require('../safety/trusted_mode').canAutoApprove(routed.intent, message)) {
+    if (routed.intent === 'run_tests') {
+      const result = require('../tools/runners').runTests({ approved: true });
+      memory.appendEpisode(sessionId, 'assistant', result.ok ? result.output : result.error);
+      return {
+        sessionId,
+        response: result.ok
+          ? `Trusted mode ran tests:\n\`\`\`\n${(result.output || '').slice(0, 5000)}\n\`\`\``
+          : `Trusted mode test run failed: ${result.error}`,
+        intent: routed,
+        safety: { level: 'TRUSTED_AUTO', reason: 'Trusted Operator Mode' },
+        toolResults: [{ tool: 'run_tests', result }],
+        iterations: 0,
+        provider: 'local',
+        online: true,
+      };
+    }
+    if (routed.intent === 'build_project') {
+      const result = require('../tools/runners').runBuild({ approved: true });
+      return {
+        sessionId,
+        response: result.ok
+          ? `Trusted mode ran build:\n\`\`\`\n${(result.output || '').slice(0, 5000)}\n\`\`\``
+          : `Trusted mode build failed: ${result.error}`,
+        intent: routed,
+        safety: { level: 'TRUSTED_AUTO', reason: 'Trusted Operator Mode' },
+        toolResults: [{ tool: 'build_project', result }],
+        iterations: 0,
+        provider: 'local',
+        online: true,
+      };
+    }
+    if (routed.intent === 'search_web') {
+      const q = routed.params?.searchQuery || routed.normalized || message;
+      const result = require('../tools/web_search').searchWeb(q, { open: true });
+      memory.appendEpisode(sessionId, 'assistant', result.url || result.error || '');
+      return {
+        sessionId,
+        response: result.ok ? `Trusted mode opened research: ${result.url}` : result.error,
+        intent: routed,
+        safety: { level: 'TRUSTED_AUTO', reason: 'Trusted Operator Mode' },
+        toolResults: [{ tool: 'search_web', result }],
+        iterations: 0,
+        provider: 'local',
+        online: true,
+      };
+    }
   }
 
   if (config.companion.enabled && companion.isWakePhrase(message)) {
@@ -443,13 +502,28 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
 
 async function executeApprovedAction(item, sessionId) {
   const action = item?.action;
-  if (action === 'search_web' || action === 'shell' && /search/i.test(item.command || '')) {
+  if (action === 'search_web' || action === 'research_web') {
+    if (action === 'research_web') {
+      const result = await require('../tools/research_web').researchTopic(item.command, { openBrowser: true });
+      return { response: result.markdown || result.error, toolResults: [{ tool: 'research_web', result }] };
+    }
     const result = require('../tools/web_search').searchWeb(item.command, { open: true });
     return {
       response: result.ok
         ? `Approved + opened search for **${result.query}**\n${result.url}`
         : `Approved, but search failed: ${result.error}`,
       toolResults: [{ tool: 'search_web', result }],
+    };
+  }
+  if (action === 'browse_site') {
+    const result = await require('../tools/research_web').browseSite(item.command, { open: true });
+    return { response: result.markdown || result.error, toolResults: [{ tool: 'browse_site', result }] };
+  }
+  if (action === 'laptop_control' || action === 'desktop_automate') {
+    const shot = require('../bridge/automation').run({ action: 'screenshot' });
+    return {
+      response: `Approved laptop control. Screenshot: ${shot.path || shot.error || 'ready'}. Give me the next click/type steps.`,
+      toolResults: [{ tool: 'laptop_control', result: shot }],
     };
   }
   if (action === 'run_tests') {
@@ -565,14 +639,69 @@ async function handleLocalOperatorIntent({ routed, safety, sessionId, message })
     }
     return reply(result.error || 'Could not read file.', 'read_file', result);
   }
+  if (routed.intent === 'trusted_mode_on') {
+    const state = require('../safety/trusted_mode').enable({ by: 'voice/text' });
+    return reply(
+      `**Trusted Operator Mode ON.**\nI will take research, laptop control, install/build/test, and git-write decisions for you.\nHard blocks still apply: secrets, destructive wipes, payments, voice cloning.\nSay \`Tony trusted mode off\` anytime.`,
+      'trusted_mode',
+      state
+    );
+  }
+  if (routed.intent === 'trusted_mode_off') {
+    const state = require('../safety/trusted_mode').disable();
+    return reply('Trusted Operator Mode OFF. Approvals required again for risky actions.', 'trusted_mode', state);
+  }
+  if (routed.intent === 'research_web') {
+    const query = params.searchQuery || routed.normalized || message;
+    const trustedOn = require('../safety/trusted_mode').isEnabled();
+    if (!trustedOn) {
+      const pending = approvals.create({
+        action: 'research_web',
+        command: query,
+        reason: 'Full-web research',
+        sessionId,
+      });
+      return reply(
+        `Research ready for **${query}**.\nApprove with **yes**, or enable \`Tony trusted mode on\` for continuous research autonomy.\nPending: ${pending.id}`,
+        'research_web',
+        { needsApproval: true, pendingApprovalId: pending.id }
+      );
+    }
+    const result = await require('../tools/research_web').researchTopic(query, { openBrowser: true });
+    return reply(result.markdown || JSON.stringify(result), 'research_web', result);
+  }
+  if (routed.intent === 'laptop_control') {
+    const trustedOn = require('../safety/trusted_mode').isEnabled();
+    if (!trustedOn) {
+      const pending = approvals.create({
+        action: 'laptop_control',
+        command: message,
+        reason: 'Laptop control',
+        sessionId,
+      });
+      return reply(
+        `Laptop control armed. Approve with **yes** or enable Trusted Mode.\nPending: ${pending.id}`,
+        'laptop_control',
+        { needsApproval: true, pendingApprovalId: pending.id }
+      );
+    }
+    const shot = require('../bridge/automation').run({ action: 'screenshot' });
+    return reply(
+      `Trusted laptop control active. Screenshot: ${shot.path || shot.error || 'n/a'}\nTell me clicks/typing steps and I will drive the desktop.`,
+      'laptop_control',
+      shot
+    );
+  }
   if (routed.intent === 'settings') {
     const prefs = require('../tools/preferences').load();
     const stt = require('../voice/local_stt').status();
+    const trustedStatus = require('../safety/trusted_mode').status();
     const response = `# Preferences
 
 - Assistant: ${prefs.assistantName}
 - User: ${prefs.userName}
 - Language: ${prefs.language}
+- Trusted mode: ${trustedStatus.label}
 - Always listen: ${prefs.voice?.alwaysListen}
 - Prefer local TTS: ${prefs.voice?.preferLocalTts}
 - Prefer local STT: ${prefs.voice?.preferLocalStt}
@@ -580,8 +709,9 @@ async function handleLocalOperatorIntent({ routed, safety, sessionId, message })
 - Local STT bridge: ${stt.configured ? 'script ready' : 'missing'}
 - Recent commands: ${(prefs.recentCommands || []).slice(0, 5).map((c) => c.command).join(' | ') || 'none'}
 
+Say \`Tony trusted mode on\` for full laptop + web research autonomy.
 Say "project note: …" to save a note (no secrets).`;
-    return reply(response, 'preferences_get', { ok: true, preferences: prefs, stt });
+    return reply(response, 'preferences_get', { ok: true, preferences: prefs, stt, trustedStatus });
   }
   if (/^project\s+note\s*:/i.test(message)) {
     const note = message.replace(/^project\s+note\s*:/i, '').trim();

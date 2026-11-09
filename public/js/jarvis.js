@@ -127,7 +127,14 @@
       $('#statBrain').textContent = (h.llm || 'groq').toUpperCase();
       $('#statTools').textContent = h.tools || '—';
       $('#statGraph').textContent = h.mind?.graphify?.nodes || h.codegraph?.nodes || '—';
-      $('#statMode').textContent = h.online ? 'ONLINE' : 'LOCAL';
+      $('#statMode').textContent = h.operator?.trustedMode?.enabled
+        ? 'TRUSTED'
+        : h.online
+          ? 'ONLINE'
+          : 'LOCAL';
+      if ($('#trustedLabel')) {
+        $('#trustedLabel').textContent = `Trusted mode: ${h.operator?.trustedMode?.label || '—'}`;
+      }
       if (h.companion?.userName) {
         window.__tonyUserName = h.companion.userName;
         document.title = `TONY · JARVIS — ${h.companion.userName}`;
@@ -377,6 +384,22 @@
         api('/api/preferences').then((r) => ({
           markdown: `# Preferences\n\`\`\`json\n${JSON.stringify(r.preferences, null, 2)}\n\`\`\``,
         }))
+      )
+    );
+    $('#btnTrustedOn')?.addEventListener('click', () =>
+      operatorAction('trusted on', () =>
+        api('/api/trusted-mode', { method: 'POST', body: JSON.stringify({ enabled: true }) }).then((r) => {
+          loadStatus();
+          return { markdown: `**Trusted Operator Mode ON**\n\n${r.note || ''}` };
+        })
+      )
+    );
+    $('#btnTrustedOff')?.addEventListener('click', () =>
+      operatorAction('trusted off', () =>
+        api('/api/trusted-mode', { method: 'POST', body: JSON.stringify({ enabled: false }) }).then(() => {
+          loadStatus();
+          return { markdown: 'Trusted Operator Mode OFF — approvals required again.' };
+        })
       )
     );
 

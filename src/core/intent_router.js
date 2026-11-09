@@ -153,6 +153,50 @@ const RULES = [
   },
   {
     category: 'settings',
+    intent: 'trusted_mode_on',
+    patterns: [
+      /\btrusted\s+mode\s+on\b/i,
+      /\benable\s+trusted\s+mode\b/i,
+      /\bfull\s+(control|access|autonomy)\s+on\b/i,
+      /\btake\s+(full\s+)?control\b/i,
+      /\byou\s+decide\b/i,
+      /\bauto\s+approve\s+on\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'trusted_mode_off',
+    patterns: [
+      /\btrusted\s+mode\s+off\b/i,
+      /\bdisable\s+trusted\s+mode\b/i,
+      /\bfull\s+(control|access|autonomy)\s+off\b/i,
+      /\bauto\s+approve\s+off\b/i,
+    ],
+  },
+  {
+    category: 'search_web',
+    intent: 'research_web',
+    patterns: [
+      /\bresearch\b/i,
+      /\bdeep\s+research\b/i,
+      /\binvestigate\b/i,
+      /\btahqeeq\b/i,
+      /\bdhundo\s+aur\s+samjhao\b/i,
+    ],
+  },
+  {
+    category: 'open_app',
+    intent: 'laptop_control',
+    patterns: [
+      /\blaptop\s+control\b/i,
+      /\bdesktop\s+control\b/i,
+      /\bscreen\s+control\b/i,
+      /\bmouse\s+control\b/i,
+      /\bkeyboard\s+control\b/i,
+    ],
+  },
+  {
+    category: 'settings',
     intent: 'settings',
     patterns: [
       /\bwake\s+mode\b/i,

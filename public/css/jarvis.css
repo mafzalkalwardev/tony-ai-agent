@@ -467,3 +467,11 @@ dialog {
   flex-wrap: wrap;
   gap: 0.45rem;
 }
+
+.trusted-label {
+  margin-top: 0.65rem;
+  font-family: var(--font-hud);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: #ffcc66;
+}

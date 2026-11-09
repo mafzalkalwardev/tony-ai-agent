@@ -127,11 +127,20 @@ function classifyIntent(intent, command = '') {
   return { level: 'SAFE', reason: 'No risky pattern detected' };
 }
 
-function canRunCommand(command, { approved = false, unsafeMode = false } = {}) {
+function canRunCommand(command, { approved = false, unsafeMode = false, action = 'shell' } = {}) {
   const { level, reason } = classifyCommand(command);
-  if (unsafeMode && level !== 'BLOCKED') return { allowed: true, level: 'UNSAFE_OVERRIDE', reason };
+  if (level === 'BLOCKED') return { allowed: false, level, reason };
+  if (unsafeMode) return { allowed: true, level: 'UNSAFE_OVERRIDE', reason };
   if (level === 'SAFE') return { allowed: true, level, reason };
   if (level === 'NEEDS_APPROVAL' && approved) return { allowed: true, level, reason: 'User approved' };
+  try {
+    const trusted = require('./trusted_mode');
+    if (level === 'NEEDS_APPROVAL' && trusted.canAutoApprove(action, command)) {
+      return { allowed: true, level: 'TRUSTED_AUTO', reason: 'Trusted Operator Mode auto-approved' };
+    }
+  } catch {
+    /* ignore */
+  }
   return { allowed: false, level, reason };
 }
 

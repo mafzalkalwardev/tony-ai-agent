@@ -1,6 +1,6 @@
 # TONY — Operator Roadmap
 
-Last updated: 2026-11-09 (v2.9)
+Last updated: 2026-11-09 (v2.10)
 
 Incremental improvements only. Do not rebuild from scratch.
 
@@ -21,6 +21,10 @@ Incremental improvements only. Do not rebuild from scratch.
 - [x] Optional faster-whisper local STT bridge script
 - [x] Large-file overwrite approval gate
 - [x] Approve-and-run for tests/build/search/shell
+- [x] Trusted Operator Mode (opt-in full laptop + web research autonomy)
+- [x] Decision engine for big/risky choices
+- [x] Expanded desktop control (scroll/drag/doubleclick/sequence)
+- [x] Full-web research + browse any public http(s) site
 
 ## Next
 
@@ -31,7 +35,7 @@ Incremental improvements only. Do not rebuild from scratch.
 ### Operator
 - [ ] Multi-repo workspace picker
 - [ ] Auto-attach latest test report into delivery export
-- [ ] Richer GitHub PR create via `gh` after approval
+- [ ] Richer GitHub PR create via `gh` after trusted/approval
 
 ### Hardening
 - [ ] Encrypted preference vault option
@@ -40,6 +44,9 @@ Incremental improvements only. Do not rebuild from scratch.
 ## New demos
 
 ```text
+Tony trusted mode on
+Tony research groq rate limits
+Tony laptop control
 Tony repo summarize karo
 Tony explain changed files
 Tony commit message banao
@@ -48,4 +55,5 @@ Tony VS Code kholo
 Tony browser mein search karo groq models
 Tony project note: client wants dark mode
 Tony export delivery
+Tony trusted mode off
 ```

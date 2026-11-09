@@ -1,7 +1,7 @@
 {
   "name": "tony-agent",
-  "version": "2.9.0",
-  "description": "TONY — multi-LLM agent, JARVIS operator, GitHub helpers, web/open-app tools, local STT bridge, companion mode, MCP, goals",
+  "version": "2.10.0",
+  "description": "TONY — trusted laptop operator, full-web research, desktop control, GitHub helpers, JARVIS, companion mode, MCP, goals",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {

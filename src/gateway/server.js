@@ -42,11 +42,12 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.9.0',
+    version: '2.10.0',
     llm: config.llmProvider,
     operator: {
       categories: require('../core/intent_router').CATEGORIES,
       pendingApprovals: require('../safety/approvals').list('pending').length,
+      trustedMode: require('../safety/trusted_mode').status(),
     },
     llmChain: require('../llm').providerStatus(),
     online,
@@ -467,6 +468,53 @@ app.post('/api/preferences', auth, (req, res) => {
 
 app.get('/api/voice/local-stt', auth, (_req, res) => {
   res.json({ ok: true, ...require('../voice/local_stt').status() });
+});
+
+app.get('/api/trusted-mode', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../safety/trusted_mode').status() });
+});
+
+app.post('/api/trusted-mode', auth, (req, res) => {
+  const trusted = require('../safety/trusted_mode');
+  const enabled = req.body?.enabled;
+  if (enabled === true) return res.json({ ok: true, ...trusted.enable({ by: 'api' }) });
+  if (enabled === false) return res.json({ ok: true, ...trusted.disable() });
+  res.json({ ok: true, ...trusted.status() });
+});
+
+app.post('/api/research', auth, async (req, res) => {
+  try {
+    const { query, urls, openBrowser } = req.body || {};
+    if (!query) return res.status(400).json({ error: 'query required' });
+    const trusted = require('../safety/trusted_mode');
+    if (!trusted.isEnabled() && !req.body?.approved) {
+      const pending = require('../safety/approvals').create({
+        action: 'research_web',
+        command: query,
+        reason: 'API research requires approval or trusted mode',
+      });
+      return res.status(402).json({ ok: false, needsApproval: true, pendingApprovalId: pending.id });
+    }
+    res.json(await require('../tools/research_web').researchTopic(query, { urls, openBrowser }));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/decide', auth, async (req, res) => {
+  try {
+    const { message, intent } = req.body || {};
+    if (!message) return res.status(400).json({ error: 'message required' });
+    res.json(
+      await require('../core/decision_engine').decideAndMaybeExecute({
+        message,
+        intent: { intent: intent || 'unknown' },
+        sessionId: req.body?.sessionId || 'api',
+      })
+    );
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/', (_req, res) => {

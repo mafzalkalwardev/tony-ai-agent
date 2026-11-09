@@ -42,6 +42,13 @@
 - [x] faster-whisper local STT bridge + approve-and-run actions
 - [x] Large-file overwrite approval
 
+## v2.10 (shipped)
+
+- [x] Trusted Operator Mode for full laptop + web research autonomy
+- [x] Decision engine for high-risk choices
+- [x] Expanded desktop automation sequences
+- [x] research_web / browse_site for any public http(s) URL
+
 ## v2.1 (next)
 
 - [ ] Telegram / Discord channels

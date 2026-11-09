@@ -161,6 +161,13 @@ module.exports = {
     maxRetries: Number(env('TONY_SELF_HEAL_RETRIES', '1')),
   },
   shellUnsafe: env('TONY_SHELL_UNSAFE', 'false') === 'true',
+  trustedMode: {
+    enabledByDefault: env('TONY_TRUSTED_MODE', 'false') === 'true',
+  },
+  research: {
+    allowAnyHttp: env('TONY_RESEARCH_ANY_HTTP', 'true') === 'true',
+    openBrowserOnResearch: env('TONY_RESEARCH_OPEN_BROWSER', 'true') === 'true',
+  },
   companion: {
     enabled: env('TONY_COMPANION_MODE', 'true') === 'true',
     userName: env('TONY_USER_NAME', 'Muhammad Afzal'),

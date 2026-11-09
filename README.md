@@ -47,7 +47,19 @@ Intent categories: `chat`, `open_app`, `search_web`, `copy_paste`, `file_task`, 
 
 JARVIS Systems panel also has one-click: Repo summary · Explain changes · Commit message · Prepare PR · Export delivery · Preferences.
 
-Risky actions (push, deploy, install, build, send, browser search) require approval. Saying **yes/haan** can auto-run approved tests/build/search/shell. See [TODO.md](TODO.md).
+### Trusted Operator Mode (full laptop + web research)
+
+```text
+Tony trusted mode on
+```
+
+When ON, TONY auto-approves research on any public site, desktop/laptop control, installs, builds/tests, and git write actions — and will take big operator decisions for you.
+
+Hard blocks always remain: secrets/`.env`, `rm -rf`, payments/checkout, voice cloning.
+
+Turn off anytime: `Tony trusted mode off` (also buttons in JARVIS Systems).
+
+Without trusted mode, risky actions still need **yes/haan** approval. See [TODO.md](TODO.md).
 
 ### Optional Python (desktop automation)
 
