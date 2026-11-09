@@ -84,8 +84,25 @@ const RULES = [
   },
   {
     category: 'github_task',
-    intent: 'github_pr',
+    intent: 'create_pr',
     patterns: [/\b(create|open)\s+pr\b/i, /\bpull\s+request\b/i, /\bpr\s+(banao|create)\b/i],
+  },
+  {
+    category: 'github_task',
+    intent: 'create_issue',
+    patterns: [/\b(create|open)\s+issue\b/i, /\bissue\s+(banao|create)\b/i],
+  },
+  {
+    category: 'settings',
+    intent: 'memorial_voice',
+    patterns: [
+      /\bmemorial\s+voice\b/i,
+      /\bvoice\s+clone\b/i,
+      /\bclone\s+voice\b/i,
+      /\bloved\s+one'?s?\s+voice\b/i,
+      /\byaad\s+voice\b/i,
+      /\bawaz\s+clone\b/i,
+    ],
   },
   {
     category: 'run_tests',

@@ -30,7 +30,7 @@ Incremental improvements only. Do not rebuild from scratch.
 
 ### Voice
 - [ ] Calibrate browser always-listen with silenceStopSeconds from settings
-- [ ] Explicit voice-clone consent UI flow
+- [x] Explicit memorial voice-clone consent flow (API + tools + intent)
 
 ### Operator
 - [ ] Multi-repo workspace picker

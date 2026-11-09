@@ -2,7 +2,8 @@
  * Trusted Operator Mode — opt-in elevated autonomy.
  * When enabled, TONY auto-approves most NEEDS_APPROVAL actions and drives
  * laptop/browser research aggressively. Hard BLOCKED patterns still apply
- * (secrets, destructive wipes, voice cloning, payments).
+ * (secrets, destructive wipes, deceptive deepfakes, payments).
+ * Memorial voice cloning always needs its own consent workflow.
  */
 const fs = require('fs');
 const path = require('path');
@@ -24,7 +25,7 @@ function defaults() {
     autoApproveInstall: true,
     autoApproveBuildTest: true,
     autoDecideRisky: true,
-    note: 'Hard blocks (secrets, rm -rf, payments, voice clone) always remain.',
+    note: 'Hard blocks (secrets, rm -rf, payments, deceptive deepfakes) always remain. Memorial voice needs separate consent.',
   };
 }
 
@@ -66,13 +67,21 @@ function canAutoApprove(action = '', command = '') {
   const a = String(action || '').toLowerCase();
   const c = String(command || '').toLowerCase();
 
-  if (/search_web|browser|playwright|firecrawl|web_fetch|research/.test(a) || /https?:\/\//.test(c)) {
+  // Never auto-approve memorial / voice clone — consent path is separate.
+  if (/memorial|voice_clone|clone.?voice|voice.?clone/.test(`${a} ${c}`)) {
+    return false;
+  }
+
+  if (/search_web|browser|playwright|browser_operator|firecrawl|web_fetch|research/.test(a) || /https?:\/\//.test(c)) {
     return state.autoApproveBrowser !== false;
   }
   if (/desktop|open_app|screenshot|mouse|keyboard/.test(a)) {
     return state.autoApproveDesktop !== false;
   }
-  if (/git_push|git_commit|prepare_commit|push_branch|github_pr|create_pr/.test(a) || /^git\s+(push|commit)\b/.test(c)) {
+  if (
+    /git_push|git_commit|prepare_commit|push_branch|github_pr|create_pr|create_issue/.test(a) ||
+    /^git\s+(push|commit)\b/.test(c)
+  ) {
     return state.autoApproveGitWrite !== false;
   }
   if (/install|pip install|npm install/.test(a) || /npm\s+i(nstall)?\b|pip\s+install\b/.test(c)) {

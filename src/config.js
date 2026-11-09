@@ -152,6 +152,14 @@ module.exports = {
     password: env('SIGNALMINT_PASSWORD', ''),
   },
   githubToken: env('GITHUB_TOKEN', ''),
+  telegram: {
+    botToken: env('TELEGRAM_BOT_TOKEN', ''),
+    chatId: env('TELEGRAM_CHAT_ID', ''),
+    polling: env('TELEGRAM_POLLING', 'false') === 'true',
+  },
+  memorialVoice: {
+    enabled: env('TONY_MEMORIAL_VOICE', 'true') === 'true',
+  },
   tonyDesktop: {
     path: env('TONY_DESKTOP_PATH', ''),
     enabled: env('TONY_DESKTOP_ENABLED', 'true') === 'true',

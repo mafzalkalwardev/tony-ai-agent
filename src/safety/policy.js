@@ -1,6 +1,6 @@
 /**
  * Safety policy — SAFE | NEEDS_APPROVAL | BLOCKED
- * Ported/expanded from tony-ai desktop assistant rules.
+ * Memorial voice cloning is consent-gated (not free-for-all deepfakes).
  */
 
 const BLOCKED_PATTERNS = [
@@ -15,13 +15,10 @@ const BLOCKED_PATTERNS = [
   /git\s+push\s+.*--force/i,
   /git\s+reset\s+--hard/i,
   /git\s+clean\s+-fd/i,
-  /\bvoice\s+clone\b/i,
-  /\bclone\s+voice\b/i,
-  /\bimitate\s+(my|a|his|her|their)\s+voice\b/i,
-  /\bdeepfake\s+voice\b/i,
   /\bsend\s+(email|message|whatsapp)\s+automatically\b/i,
   /\bbulk\s+sms\b/i,
   /\bmake\s+payment\b/i,
+  /\bdeepfake\s+(scam|fraud|call)\b/i,
 ];
 
 const APPROVAL_PATTERNS = [
@@ -45,6 +42,9 @@ const APPROVAL_PATTERNS = [
   /\bsend\s+(email|message|client)\b/i,
   /\bdelete\s+file\b/i,
   /\boverwrite\b/i,
+  /\bmemorial\s+voice\b/i,
+  /\bvoice\s+clone\b/i,
+  /\bclone\s+voice\b/i,
 ];
 
 const SAFE_PATTERNS = [
@@ -64,6 +64,8 @@ const INTENT_APPROVAL = new Set([
   'git_push',
   'git_commit',
   'github_pr',
+  'create_issue',
+  'create_pr',
   'build_project',
   'run_tests',
   'search_web',
@@ -71,6 +73,8 @@ const INTENT_APPROVAL = new Set([
   'send_message',
   'install_dependencies',
   'run_shell_command',
+  'memorial_voice',
+  'voice_clone',
 ]);
 
 const INTENT_SAFE = new Set([
@@ -86,9 +90,10 @@ const INTENT_SAFE = new Set([
   'open_app',
   'settings',
   'file_task',
+  'list_memorial_voices',
 ]);
 
-const INTENT_BLOCKED = new Set(['voice_clone', 'read_secrets']);
+const INTENT_BLOCKED = new Set(['read_secrets']);
 
 function classifyCommand(command) {
   const cmd = String(command || '').trim();
@@ -111,12 +116,29 @@ function classifyCommand(command) {
 
 function classifyIntent(intent, command = '') {
   const name = String(intent || '').trim();
-  if (INTENT_BLOCKED.has(name) || /\b(voice clone|clone voice)\b/i.test(command)) {
+  const text = `${name} ${command}`;
+
+  if (INTENT_BLOCKED.has(name)) {
+    return { level: 'BLOCKED', reason: 'Secret access blocked' };
+  }
+
+  // Deceptive / scam deepfake language stays blocked.
+  if (/\b(deepfake\s+(scam|fraud|call)|impersonate\s+to\s+scam|fake\s+call\s+to\s+bank)\b/i.test(text)) {
+    return { level: 'BLOCKED', reason: 'Deceptive voice impersonation is blocked.' };
+  }
+
+  // Memorial / emotional voice clone requires consent workflow (approval), not silent block.
+  if (
+    INTENT_APPROVAL.has(name) &&
+    (name === 'memorial_voice' || name === 'voice_clone' || /\b(memorial\s+voice|voice\s+clone|clone\s+voice)\b/i.test(text))
+  ) {
     return {
-      level: 'BLOCKED',
-      reason: 'Voice cloning / secret access blocked without explicit consent workflow',
+      level: 'NEEDS_APPROVAL',
+      reason:
+        'Memorial voice cloning requires explicit consent phrase + rights affirmation (personal remembrance only).',
     };
   }
+
   if (INTENT_SAFE.has(name)) {
     return { level: 'SAFE', reason: `${name} is safe` };
   }
@@ -135,6 +157,10 @@ function canRunCommand(command, { approved = false, unsafeMode = false, action =
   if (level === 'NEEDS_APPROVAL' && approved) return { allowed: true, level, reason: 'User approved' };
   try {
     const trusted = require('./trusted_mode');
+    // Trusted mode does NOT auto-approve memorial/voice clone — consent is separate.
+    if (/memorial|voice_clone|clone voice|voice clone/i.test(`${action} ${command}`)) {
+      return { allowed: false, level, reason: 'Memorial voice requires explicit consent workflow' };
+    }
     if (level === 'NEEDS_APPROVAL' && trusted.canAutoApprove(action, command)) {
       return { allowed: true, level: 'TRUSTED_AUTO', reason: 'Trusted Operator Mode auto-approved' };
     }
@@ -145,7 +171,9 @@ function canRunCommand(command, { approved = false, unsafeMode = false, action =
 }
 
 function voiceCloneConsentRequired(text) {
-  return /\b(voice clone|clone voice|imitate.*voice|deepfake voice)\b/i.test(String(text || ''));
+  return /\b(voice clone|clone voice|imitate.*voice|memorial voice|deepfake voice)\b/i.test(
+    String(text || '')
+  );
 }
 
 module.exports = {

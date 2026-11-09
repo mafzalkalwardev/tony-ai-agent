@@ -372,6 +372,20 @@
         api('/api/github/prepare-pr', { method: 'POST', body: JSON.stringify({}) })
       )
     );
+    $('#btnMemorialVoice')?.addEventListener('click', () =>
+      operatorAction('memorial voice', () =>
+        api('/api/memorial-voice').then((r) => {
+          const list = Array.isArray(r.voices) ? r.voices : [];
+          return {
+            markdown: `# Memorial voices\nMode: \`${r.mode}\` · registered: **${list.length}**\n\n\`\`\`json\n${JSON.stringify(
+              list,
+              null,
+              2
+            )}\n\`\`\`\n\nSay: *memorial voice* in chat to start consent-gated cloning for a loved one.`,
+          };
+        })
+      )
+    );
     $('#btnExportDelivery')?.addEventListener('click', () =>
       operatorAction('export delivery', () =>
         api('/api/delivery/export', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({

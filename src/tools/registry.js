@@ -1362,7 +1362,7 @@ builtins.local_stt_status = {
 builtins.trusted_mode = {
   name: 'trusted_mode',
   description:
-    'Enable/disable Trusted Operator Mode. When ON, TONY auto-approves research, desktop control, installs, builds, git write — hard blocks (secrets/rm -rf/payments/voice-clone) remain.',
+    'Enable/disable Trusted Operator Mode. When ON, TONY auto-approves research, desktop control, installs, builds, git write — hard blocks (secrets/rm -rf/payments/deceptive deepfakes) remain. Memorial voice still needs consent.',
   parameters: {
     type: 'object',
     properties: {
@@ -1495,6 +1495,198 @@ builtins.laptop_control = {
       };
     }
     return automation.run({ action: 'sequence', steps });
+  },
+};
+
+builtins.browser_operator = {
+  name: 'browser_operator',
+  description:
+    'Always-on browser operator via Playwright MCP — navigate, snapshot, click, type on any public site. Start with npm run playwright:mcp.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['status', 'navigate', 'snapshot', 'click', 'type', 'research'],
+      },
+      url: { type: 'string' },
+      ref: { type: 'string' },
+      text: { type: 'string' },
+      approved: { type: 'boolean' },
+    },
+    required: ['action'],
+  },
+  async execute({ action, url, ref, text, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    const op = require('./browser_operator');
+    if (action === 'status') return { ok: true, ...op.status(), ready: await op.ensureReady() };
+    if (!approved && !trusted.canAutoApprove('browser_operator', action)) {
+      const pending = require('../safety/approvals').create({
+        action: 'browser_operator',
+        command: `${action} ${url || ref || ''}`.trim(),
+        reason: 'Browser operator requires approval or Trusted Mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    if (action === 'navigate') return op.navigate(url);
+    if (action === 'snapshot') return op.snapshot(url);
+    if (action === 'click') return op.click(ref);
+    if (action === 'type') return op.type(ref, text);
+    if (action === 'research') return op.researchAndSnapshot(url);
+    return { ok: false, error: `Unknown action: ${action}` };
+  },
+};
+
+builtins.create_issue = {
+  name: 'create_issue',
+  description: 'Create a GitHub issue via gh CLI (requires approval or Trusted Mode)',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      body: { type: 'string' },
+      approved: { type: 'boolean' },
+    },
+    required: ['title'],
+  },
+  async execute({ title, body = '', approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('create_issue', title)) {
+      const pending = require('../safety/approvals').create({
+        action: 'create_issue',
+        command: title,
+        reason: 'Creating GitHub issues requires approval or Trusted Mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('./github_helper').createIssue({ title, body });
+  },
+};
+
+builtins.create_pr = {
+  name: 'create_pr',
+  description: 'Create a GitHub pull request via gh CLI (requires approval or Trusted Mode)',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      body: { type: 'string' },
+      base: { type: 'string', default: 'master' },
+      draft: { type: 'boolean' },
+      approved: { type: 'boolean' },
+    },
+  },
+  async execute({ title, body = '', base = 'master', draft = false, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('create_pr', title || 'pr')) {
+      const pending = require('../safety/approvals').create({
+        action: 'create_pr',
+        command: title || 'create pr',
+        reason: 'Creating GitHub PRs requires approval or Trusted Mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('./github_helper').createPullRequest({ title, body, base, draft });
+  },
+};
+
+builtins.telegram_status = {
+  name: 'telegram_status',
+  description: 'Show Telegram remote channel status',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../channels/telegram').status() };
+  },
+};
+
+builtins.telegram_send = {
+  name: 'telegram_send',
+  description: 'Send a message to the configured Telegram chat (approval/trusted for outbound)',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      approved: { type: 'boolean' },
+    },
+    required: ['text'],
+  },
+  async execute({ text, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('send_message', text)) {
+      const pending = require('../safety/approvals').create({
+        action: 'telegram_send',
+        command: text.slice(0, 120),
+        reason: 'Outbound Telegram message requires approval',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('../channels/telegram').sendMessage(text);
+  },
+};
+
+builtins.memorial_voice_register = {
+  name: 'memorial_voice_register',
+  description:
+    'Register a MEMORIAL voice for a loved one (often deceased) with explicit consent. Requires consent phrase, rights affirmation, personal-use-only, and local audio samples. Not for scams or deceiving third parties.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      relationship: { type: 'string' },
+      personStatus: { type: 'string', enum: ['deceased', 'living'] },
+      samplePaths: { type: 'array', items: { type: 'string' } },
+      hasRights: { type: 'boolean' },
+      personalMemorialOnly: { type: 'boolean' },
+      notForDeception: { type: 'boolean' },
+      livingPermission: { type: 'boolean' },
+      consentText: { type: 'string', description: 'Must include: I consent to memorial voice for <Name>' },
+    },
+    required: ['name', 'relationship', 'samplePaths', 'consentText'],
+  },
+  async execute(args = {}) {
+    if (!require('../config').memorialVoice?.enabled) {
+      return { ok: false, error: 'Memorial voice disabled in config' };
+    }
+    return require('../voice/memorial_voice').registerMemorialVoice(args);
+  },
+};
+
+builtins.memorial_voice_clone = {
+  name: 'memorial_voice_clone',
+  description: 'Create ElevenLabs Instant Voice Clone for a consented memorial voice profile',
+  parameters: {
+    type: 'object',
+    properties: { name: { type: 'string' } },
+    required: ['name'],
+  },
+  async execute({ name }) {
+    return require('../voice/memorial_voice').cloneMemorialVoice(name);
+  },
+};
+
+builtins.memorial_voice_speak = {
+  name: 'memorial_voice_speak',
+  description: 'Speak text using a consented memorial voice (always labeled as synthetic remembrance)',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      text: { type: 'string' },
+    },
+    required: ['name', 'text'],
+  },
+  async execute({ name, text }) {
+    return require('../voice/memorial_voice').speakMemorial(name, text);
+  },
+};
+
+builtins.memorial_voice_list = {
+  name: 'memorial_voice_list',
+  description: 'List consented memorial voices (no raw audio paths exposed beyond counts)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    const memorial = require('../voice/memorial_voice');
+    return { ok: true, voices: memorial.listVoices(), status: memorial.status() };
   },
 };
 

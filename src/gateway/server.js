@@ -42,12 +42,15 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.10.0',
+    version: '2.11.0',
     llm: config.llmProvider,
     operator: {
       categories: require('../core/intent_router').CATEGORIES,
       pendingApprovals: require('../safety/approvals').list('pending').length,
       trustedMode: require('../safety/trusted_mode').status(),
+      telegram: require('../channels/telegram').status(),
+      memorialVoice: require('../voice/memorial_voice').status(),
+      browserOperator: require('../tools/browser_operator').status(),
     },
     llmChain: require('../llm').providerStatus(),
     online,
@@ -454,6 +457,117 @@ app.post('/api/github/prepare-pr', auth, (req, res) => {
   res.json(require('../tools/github_helper').preparePrInstructions(req.body?.topic || ''));
 });
 
+app.post('/api/github/create-issue', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'create_issue',
+      {
+        title: req.body?.title,
+        body: req.body?.body || '',
+        approved: Boolean(req.body?.approved),
+      },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/github/create-pr', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'create_pr',
+      {
+        title: req.body?.title,
+        body: req.body?.body || '',
+        base: req.body?.base || 'master',
+        draft: Boolean(req.body?.draft),
+        approved: Boolean(req.body?.approved),
+      },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/telegram/status', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../channels/telegram').status() });
+});
+
+app.post('/api/telegram/webhook', auth, async (req, res) => {
+  try {
+    res.json(await require('../channels/telegram').handleUpdate(req.body || {}));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/telegram/send', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'telegram_send',
+      { text: req.body?.text || '', approved: Boolean(req.body?.approved) },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/memorial-voice', auth, (_req, res) => {
+  const memorial = require('../voice/memorial_voice');
+  res.json({ ok: true, ...memorial.status(), voices: memorial.listVoices() });
+});
+
+app.post('/api/memorial-voice/register', auth, async (req, res) => {
+  try {
+    res.json(require('../voice/memorial_voice').registerMemorialVoice(req.body || {}));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/memorial-voice/clone', auth, async (req, res) => {
+  try {
+    res.json(await require('../voice/memorial_voice').cloneMemorialVoice(req.body?.name));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/memorial-voice/speak', auth, async (req, res) => {
+  try {
+    const { name, text } = req.body || {};
+    if (!name || !text) return res.status(400).json({ error: 'name and text required' });
+    res.json(await require('../voice/memorial_voice').speakMemorial(name, text));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/browser/operator', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'browser_operator',
+      {
+        action: req.body?.action || 'status',
+        url: req.body?.url,
+        ref: req.body?.ref,
+        text: req.body?.text,
+        approved: Boolean(req.body?.approved),
+      },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/preferences', auth, (_req, res) => {
   res.json({ ok: true, preferences: require('../tools/preferences').load() });
 });
@@ -566,6 +680,12 @@ if (require.main === module) {
   server.listen(config.port, () => {
     console.log(`TONY gateway listening on http://localhost:${config.port}`);
     console.log(`WebSocket: ws://localhost:${config.port}/ws?token=***`);
+    if (config.telegram?.polling && config.telegram?.botToken) {
+      require('../channels/telegram')
+        .startPolling()
+        .then((r) => console.log('Telegram polling:', r.ok ? 'on' : r.error))
+        .catch((e) => console.warn('Telegram polling failed:', e.message));
+    }
   });
 }
 

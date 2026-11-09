@@ -28,7 +28,10 @@
 ## v2.8 (shipped)
 
 - [x] Intent router + Roman Urdu operator commands
-- [x] Expanded safety (deploy, voice-clone block, approval queue)
+- [x] Expanded safety (deploy, deceptive deepfake block, memorial voice consent, approval queue)
+- [x] Memorial voice cloning (consent-gated + ElevenLabs Instant Voice Clone)
+- [x] Telegram remote channel
+- [x] Playwright browser operator + gh create issue/PR
 - [x] Project scanner + test/build runners + delivery helper
 - [x] JARVIS operator strip (transcript, intent, approvals)
 - [x] Local-first TTS preference + silence threshold config

@@ -113,9 +113,17 @@ async function main() {
   assert('safety blocks rm -rf', classifyCommand('rm -rf /').level === 'BLOCKED');
   assert('safety allows git status', canRunCommand('git status').allowed === true);
   assert('safety build needs approval', classifyCommand('npm run build').level === 'NEEDS_APPROVAL');
-  assert('safety blocks voice clone', classifyCommand('clone voice like my client').level === 'BLOCKED');
+  assert(
+    'safety memorial voice needs consent/approval',
+    classifyCommand('clone voice like my loved one').level === 'NEEDS_APPROVAL'
+  );
+  assert(
+    'safety blocks deceptive deepfake scam',
+    classifyCommand('deepfake scam call').level === 'BLOCKED'
+  );
   assert('voice clone consent flag', voiceCloneConsentRequired('please clone voice') === true);
   assert('intent push needs approval', classifyIntent('git_push').level === 'NEEDS_APPROVAL');
+  assert('intent memorial needs approval', classifyIntent('memorial_voice').level === 'NEEDS_APPROVAL');
   assert('intent scan safe', classifyIntent('project_scan').level === 'SAFE');
 
   const intentRouter = require('../src/core/intent_router');
@@ -130,6 +138,9 @@ async function main() {
   assert('intent explain changes', intentRouter.route('explain changed files').intent === 'explain_changes');
   assert('intent commit message', intentRouter.route('commit message banao').intent === 'commit_message');
   assert('intent prepare pr', intentRouter.route('prepare pr').intent === 'prepare_pr');
+  assert('intent create issue', intentRouter.route('create issue login bug').intent === 'create_issue');
+  assert('intent create pr', intentRouter.route('create pr').intent === 'create_pr');
+  assert('intent memorial voice', intentRouter.route('memorial voice for ammi').intent === 'memorial_voice');
   assert('intent open vscode', intentRouter.route('VS Code kholo').intent === 'open_app');
 
   const params = require('../src/core/params');
@@ -142,6 +153,41 @@ async function main() {
   assert('github explain', gh.explainChangedFiles().ok === true);
   assert('github commit draft', gh.generateCommitMessage('operator').message.includes('feat:'));
   assert('github pr prep', gh.preparePrInstructions().draftOnly === true);
+  assert('github createIssue fn', typeof gh.createIssue === 'function');
+  assert('github createPR fn', typeof gh.createPullRequest === 'function');
+
+  const memorial = require('../src/voice/memorial_voice');
+  const consentFail = memorial.buildConsentRecord({
+    name: 'Ammi',
+    relationship: 'mother',
+    hasRights: true,
+    personalMemorialOnly: true,
+    notForDeception: true,
+    consentText: 'yes clone it',
+  });
+  assert('memorial consent phrase required', consentFail.ok === false);
+  const consentOk = memorial.buildConsentRecord({
+    name: 'Ammi',
+    relationship: 'mother',
+    personStatus: 'deceased',
+    hasRights: true,
+    personalMemorialOnly: true,
+    notForDeception: true,
+    consentText: 'I consent to memorial voice for Ammi',
+  });
+  assert('memorial consent ok', consentOk.ok === true);
+  assert('memorial status', memorial.status().mode === 'memorial-consent-gated');
+  assert('memorial tools registered', Boolean(getTool('memorial_voice_register')));
+  assert('browser operator tool', Boolean(getTool('browser_operator')));
+  assert('telegram status tool', Boolean(getTool('telegram_status')));
+  assert('create_issue tool', Boolean(getTool('create_issue')));
+  assert('create_pr tool', Boolean(getTool('create_pr')));
+
+  const telegram = require('../src/channels/telegram');
+  assert('telegram status', typeof telegram.status === 'function');
+
+  const browserOp = require('../src/tools/browser_operator');
+  assert('browser operator status', browserOp.status().operator === true);
 
   const web = require('../src/tools/web_search');
   assert('web search url', web.buildSearchUrl('tony ai').includes('duckduckgo.com'));
@@ -166,6 +212,10 @@ async function main() {
   assert(
     'trusted still respects block via policy',
     require('../src/safety/policy').canRunCommand('rm -rf /', { approved: true }).allowed === false
+  );
+  assert(
+    'trusted never auto memorial',
+    trusted.canAutoApprove('memorial_voice_register', 'clone voice') === false
   );
   trusted.disable();
 

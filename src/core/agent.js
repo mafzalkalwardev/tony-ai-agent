@@ -109,9 +109,12 @@ For local Windows desktop ops, use desktop_automate (pyautogui) for click/type/h
 For realtime tasks (presentations, accounts, API keys, screen control): follow realtime-automation skill — snapshot first, act in small steps, pause at CAPTCHA for user to solve.
 Use user_profile_get / user_profile_update to remember personal details about ${config.companion.userName}.
 Use write_file + shell (with user approval for git push/commit unless Trusted Operator Mode is ON) to implement code changes.
-When Trusted Operator Mode is ON: auto-approve research on ANY public website, desktop/laptop control, installs, builds, tests, git write. Still NEVER read/write secrets (.env/tokens), never rm -rf, never voice-clone, never complete payments.
-Use research_web / browse_site / perplexity_search / firecrawl_scrape / playwright tools for full-web research.
+When Trusted Operator Mode is ON: auto-approve research on ANY public website, desktop/laptop control, installs, builds, tests, git write. Still NEVER read/write secrets (.env/tokens), never rm -rf, never complete payments, never deceptive deepfakes.
+Memorial voice cloning of loved ones is allowed ONLY through memorial_voice_* tools after explicit consent phrase + rights affirmation (personal remembrance). Always label synthetic memorial speech. Never use memorial voices to deceive third parties.
+Use browser_operator / research_web / browse_site / playwright tools for full-web research and site control.
 Use desktop_automate / laptop_control / open_app for full laptop control (click/type/scroll/drag/hotkeys/sequences).
+Use create_issue / create_pr (gh) after approval or trusted mode.
+Telegram channel can receive remote commands when configured.
 For big risky choices use decide_action — in trusted mode take the decision and execute; otherwise ask once.
 When a tool fails, analyze the error, apply a fix, and retry — do not repeat the same failing call unchanged.
 Use error_learn to save fixes that worked. Use self_heal on persistent failures.
@@ -207,7 +210,9 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
 
   if (
     safety.level === 'NEEDS_APPROVAL' &&
-    ['run_tests', 'build_project', 'git_push', 'git_commit', 'github_pr', 'search_web'].includes(routed.intent)
+    ['run_tests', 'build_project', 'git_push', 'git_commit', 'github_pr', 'create_pr', 'create_issue', 'search_web'].includes(
+      routed.intent
+    )
   ) {
     const trusted = require('../safety/trusted_mode');
     if (trusted.canAutoApprove(routed.intent, message)) {
@@ -615,6 +620,61 @@ async function handleLocalOperatorIntent({ routed, safety, sessionId, message })
     const result = require('../tools/github_helper').preparePrInstructions(params.commitTopic || '');
     return reply(result.markdown, 'prepare_pr', result);
   }
+  if (routed.intent === 'create_issue') {
+    const title =
+      params.issueTitle ||
+      String(message || '')
+        .replace(/.*\b(create|open)\s+issue\b[:\s-]*/i, '')
+        .trim() ||
+      'Tony issue';
+    const trusted = require('../safety/trusted_mode');
+    if (!trusted.canAutoApprove('create_issue', title)) {
+      const pending = approvals.create({
+        action: 'create_issue',
+        command: title,
+        reason: 'Creating GitHub issues requires approval or Trusted Mode',
+        sessionId,
+      });
+      return reply(
+        `Approval needed to create issue **${title}**.\nReply **yes** / **haan**, or \`Tony trusted mode on\`.\nPending: ${pending.id}`,
+        'create_issue',
+        { needsApproval: true, pendingApprovalId: pending.id }
+      );
+    }
+    const result = require('../tools/github_helper').createIssue({ title, body: params.body || '' });
+    return reply(
+      result.ok ? `Issue created:\n${result.output}` : `Issue create failed: ${result.error}`,
+      'create_issue',
+      result
+    );
+  }
+  if (routed.intent === 'create_pr') {
+    const trusted = require('../safety/trusted_mode');
+    const title = params.prTitle || '';
+    if (!trusted.canAutoApprove('create_pr', title || 'pr')) {
+      const pending = approvals.create({
+        action: 'create_pr',
+        command: title || 'create pr',
+        reason: 'Creating GitHub PRs requires approval or Trusted Mode',
+        sessionId,
+      });
+      return reply(
+        `Approval needed to create PR.\nReply **yes** / **haan**, or \`Tony trusted mode on\`.\nPending: ${pending.id}`,
+        'create_pr',
+        { needsApproval: true, pendingApprovalId: pending.id }
+      );
+    }
+    const result = require('../tools/github_helper').createPullRequest({
+      title: title || undefined,
+      body: params.body || '',
+      draft: Boolean(params.draft),
+    });
+    return reply(
+      result.ok ? `PR created:\n${result.output}` : `PR create failed: ${result.error}`,
+      'create_pr',
+      result
+    );
+  }
   if (routed.intent === 'copy_paste') {
     const clip = require('../tools/clipboard_tool').copyPaste({ mode: 'read' });
     return reply(
@@ -639,6 +699,34 @@ async function handleLocalOperatorIntent({ routed, safety, sessionId, message })
     }
     return reply(result.error || 'Could not read file.', 'read_file', result);
   }
+  if (routed.intent === 'memorial_voice') {
+    const memorial = require('../voice/memorial_voice');
+    const voices = memorial.listVoices();
+    const response = `# Memorial voice (personal remembrance)
+
+I can help preserve a loved one's voice for **private emotional remembrance**.
+
+This is synthetic. It is not them — it is a memory aid.
+
+## Required consent (all of it)
+1. Affirm you have the right to use their recordings
+2. Personal memorial use only
+3. Not for deceiving anyone
+4. Type: \`I consent to memorial voice for <Name>\`
+5. Provide local audio sample path(s)
+
+## Tools
+- memorial_voice_register
+- memorial_voice_clone
+- memorial_voice_speak
+- memorial_voice_list
+
+Registered memorial voices: ${voices.length ? voices.map((v) => v.name).join(', ') : 'none yet'}
+
+If you want to begin, tell me their name, your relationship, and a sample file path.`;
+    return reply(response, 'memorial_voice_list', { ok: true, voices });
+  }
+
   if (routed.intent === 'trusted_mode_on') {
     const state = require('../safety/trusted_mode').enable({ by: 'voice/text' });
     return reply(

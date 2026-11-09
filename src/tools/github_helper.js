@@ -151,9 +151,50 @@ function inferTopic(files) {
   return 'expand TONY operator capabilities';
 }
 
+function runGh(args) {
+  try {
+    const out = execSync(`gh ${args}`, {
+      cwd: config.workspaceRoot,
+      encoding: 'utf8',
+      timeout: 120000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, ...(config.githubToken ? { GH_TOKEN: config.githubToken } : {}) },
+    });
+    return { ok: true, output: String(out).trim() };
+  } catch (e) {
+    return {
+      ok: false,
+      error: String(e.stderr || e.stdout || e.message || 'gh failed').trim(),
+    };
+  }
+}
+
+function createIssue({ title, body = '', labels = [] } = {}) {
+  if (!title?.trim()) return { ok: false, error: 'Issue title required' };
+  const labelFlags = (labels || []).map((l) => `--label ${JSON.stringify(l)}`).join(' ');
+  const cmd = `issue create --title ${JSON.stringify(title)} --body ${JSON.stringify(body || 'Created by TONY')} ${labelFlags}`.trim();
+  const result = runGh(cmd);
+  return { ...result, draftOnly: false, action: 'create_issue' };
+}
+
+function createPullRequest({ title, body = '', base = 'master', draft = false } = {}) {
+  if (!title?.trim()) {
+    title = generateCommitMessage().message.split('\n')[0].replace(/^feat:\s*/i, '') || 'Tony update';
+  }
+  const draftFlag = draft ? '--draft' : '';
+  const cmd = `pr create --title ${JSON.stringify(title)} --body ${JSON.stringify(
+    body || 'Created by TONY after approval/trusted mode.'
+  )} --base ${JSON.stringify(base)} ${draftFlag}`.trim();
+  const result = runGh(cmd);
+  return { ...result, action: 'create_pr', base, draft: Boolean(draft) };
+}
+
 module.exports = {
   summarizeRepo,
   explainChangedFiles,
   generateCommitMessage,
   preparePrInstructions,
+  createIssue,
+  createPullRequest,
+  runGh,
 };
