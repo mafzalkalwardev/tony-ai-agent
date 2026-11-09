@@ -244,6 +244,7 @@
         result.toolResults?.map((t) => t.tool),
         window.tonyResolveAttachments?.(result)
       );
+      if (window.tonyVoice?.Voice?.voiceOut) await window.tonyVoice.speakResponse(result.response);
     });
 
     $('#rebuildGraph')?.addEventListener('click', async () => {
