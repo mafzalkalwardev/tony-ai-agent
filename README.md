@@ -30,16 +30,24 @@ npm run desktop      # JARVIS HUD
 
 ```text
 Tony repo check karo
+Tony repo summarize karo
+Tony explain changed files
+Tony commit message banao
+Tony prepare pr
 Tony test run karo
 Tony project scan karo
 Tony client ke liye message banao
-Tony browser mein search karo
+Tony browser mein search karo groq models
+Tony VS Code kholo
 Tony mujhe status batao
+Tony project note: client wants dark mode
 ```
 
 Intent categories: `chat`, `open_app`, `search_web`, `copy_paste`, `file_task`, `github_task`, `project_scan`, `run_tests`, `build_project`, `client_delivery`, `settings`, `unknown`.
 
-Risky actions (push, deploy, install, build, send) require approval in the JARVIS operator strip. See [TODO.md](TODO.md).
+JARVIS Systems panel also has one-click: Repo summary · Explain changes · Commit message · Prepare PR · Export delivery · Preferences.
+
+Risky actions (push, deploy, install, build, send, browser search) require approval. Saying **yes/haan** can auto-run approved tests/build/search/shell. See [TODO.md](TODO.md).
 
 ### Optional Python (desktop automation)
 

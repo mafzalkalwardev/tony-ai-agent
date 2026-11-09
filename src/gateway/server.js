@@ -42,7 +42,7 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.8.0',
+    version: '2.9.0',
     llm: config.llmProvider,
     operator: {
       categories: require('../core/intent_router').CATEGORIES,
@@ -419,6 +419,54 @@ app.post('/api/delivery/prepare', auth, (req, res) => {
       limitations,
     })
   );
+});
+
+app.post('/api/delivery/export', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'export_delivery',
+      {
+        completedWork: req.body?.completedWork || '',
+        limitations: req.body?.limitations || '',
+      },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/github/summary', auth, (_req, res) => {
+  res.json(require('../tools/github_helper').summarizeRepo());
+});
+
+app.get('/api/github/changes', auth, (_req, res) => {
+  res.json(require('../tools/github_helper').explainChangedFiles());
+});
+
+app.post('/api/github/commit-message', auth, (req, res) => {
+  res.json(require('../tools/github_helper').generateCommitMessage(req.body?.topic || ''));
+});
+
+app.post('/api/github/prepare-pr', auth, (req, res) => {
+  res.json(require('../tools/github_helper').preparePrInstructions(req.body?.topic || ''));
+});
+
+app.get('/api/preferences', auth, (_req, res) => {
+  res.json({ ok: true, preferences: require('../tools/preferences').load() });
+});
+
+app.post('/api/preferences', auth, (req, res) => {
+  const prefs = require('../tools/preferences');
+  if (req.body?.projectNote) {
+    return res.json({ ok: true, preferences: prefs.addProjectNote(req.body.projectNote) });
+  }
+  res.json({ ok: true, preferences: prefs.save(req.body || {}) });
+});
+
+app.get('/api/voice/local-stt', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../voice/local_stt').status() });
 });
 
 app.get('/', (_req, res) => {

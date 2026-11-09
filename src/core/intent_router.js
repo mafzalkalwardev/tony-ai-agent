@@ -3,6 +3,8 @@
  * commands into stable categories for the dashboard and agent pipeline.
  */
 
+const { extractAll } = require('./params');
+
 const CATEGORIES = [
   'chat',
   'open_app',
@@ -32,13 +34,53 @@ const RULES = [
   },
   {
     category: 'github_task',
+    intent: 'summarize_repo',
+    patterns: [
+      /\b(repo|repository|git)\s+summar(y|ize)\b/i,
+      /\bsummarize\s+(repo|repository|git)\b/i,
+      /\brepo\s+(ka\s+)?khulasa\b/i,
+      /\brepository\s+state\b/i,
+    ],
+  },
+  {
+    category: 'github_task',
+    intent: 'explain_changes',
+    patterns: [
+      /\bexplain\s+(changed|changes|diff|files)\b/i,
+      /\bchanged\s+files\b/i,
+      /\bdiff\s+(samjhao|explain|dikhao)\b/i,
+      /\bkya\s+change\s+(hua|kiye)\b/i,
+      /\bgit\s+diff\b/i,
+    ],
+  },
+  {
+    category: 'github_task',
+    intent: 'commit_message',
+    patterns: [
+      /\bcommit\s+message\b/i,
+      /\bgenerate\s+commit\b/i,
+      /\bcommit\s+(ka\s+)?message\s+banao\b/i,
+    ],
+  },
+  {
+    category: 'github_task',
+    intent: 'prepare_pr',
+    patterns: [
+      /\bprepare\s+(pr|push)\b/i,
+      /\bpr\s+(instructions|checklist|prepare)\b/i,
+      /\bpush\s+(ke\s+liye|instructions)\b/i,
+      /\bpull\s+request\s+(banao|draft|prepare)\b/i,
+    ],
+  },
+  {
+    category: 'github_task',
     intent: 'git_push',
     patterns: [/\bgit\s+push\b/i, /\bpush\s+karo\b/i, /\bpush\s+(code|repo)\b/i],
   },
   {
     category: 'github_task',
     intent: 'git_commit',
-    patterns: [/\bgit\s+commit\b/i, /\bcommit\s+(karo|message)\b/i],
+    patterns: [/\bgit\s+commit\b/i, /\bcommit\s+karo\b/i],
   },
   {
     category: 'github_task',
@@ -76,8 +118,9 @@ const RULES = [
     patterns: [
       /\bclient\s+(ke\s+liye\s+)?message\b/i,
       /\bclient\s+ko\b/i,
-      /\bdelivery\s+(note|package|report)\b/i,
+      /\bdelivery\s+(note|package|report|export)\b/i,
       /\bmessage\s+banao\b/i,
+      /\bexport\s+delivery\b/i,
     ],
   },
   {
@@ -99,14 +142,14 @@ const RULES = [
     category: 'open_app',
     intent: 'open_app',
     patterns: [
-      /\b(vs\s*code|vscode|terminal|browser|chrome|notepad)\b.*\b(kholo|open)\b/i,
-      /\b(kholo|open)\b.*\b(vs\s*code|vscode|terminal|browser|chrome|notepad)\b/i,
+      /\b(vs\s*code|vscode|terminal|browser|chrome|notepad|calculator|explorer|file explorer)\b.*\b(kholo|open)\b/i,
+      /\b(kholo|open)\b.*\b(vs\s*code|vscode|terminal|browser|chrome|notepad|calculator|explorer|file explorer)\b/i,
     ],
   },
   {
     category: 'file_task',
     intent: 'file_task',
-    patterns: [/\b(read|parho)\s+file\b/i, /\bfile\s+(banao|create|likho)\b/i, /\bcreate\s+file\b/i],
+    patterns: [/\b(read|parho)\s+(file|[\w./\\-]+\.[\w]+)\b/i, /\bfile\s+(banao|create|likho)\b/i, /\bcreate\s+file\b/i],
   },
   {
     category: 'settings',
@@ -114,9 +157,12 @@ const RULES = [
     patterns: [
       /\bwake\s+mode\b/i,
       /\bvoice\s+(settings|setup)\b/i,
+      /\b(show|update)\s+preferences\b/i,
+      /\bpreferences\b/i,
       /\bsettings\b/i,
       /\balways\s+listen\b/i,
       /\bmic\s+check\b/i,
+      /\bproject\s+note\b/i,
     ],
   },
   {
@@ -126,7 +172,6 @@ const RULES = [
       /\b(what|who|how|why|kya|kaise|kon)\b/i,
       /\bmujhe\s+batao\b/i,
       /\bhelp\b/i,
-      /\bexplain\b/i,
       /\bsamjhao\b/i,
       /\?$/,
     ],
@@ -147,6 +192,7 @@ function normalize(text) {
 function route(message) {
   const raw = String(message || '').trim();
   const text = normalize(raw);
+  const params = extractAll(raw);
   if (!text) {
     return {
       intent: 'unknown',
@@ -154,6 +200,7 @@ function route(message) {
       confidence: 0,
       normalized: '',
       raw,
+      params,
     };
   }
 
@@ -166,6 +213,7 @@ function route(message) {
           confidence: 0.9,
           normalized: text,
           raw,
+          params,
         };
       }
     }
@@ -177,6 +225,7 @@ function route(message) {
     confidence: 0.2,
     normalized: text,
     raw,
+    params,
   };
 }
 

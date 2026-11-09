@@ -63,6 +63,7 @@ const SAFE_PATTERNS = [
 const INTENT_APPROVAL = new Set([
   'git_push',
   'git_commit',
+  'github_pr',
   'build_project',
   'run_tests',
   'search_web',
@@ -74,10 +75,15 @@ const INTENT_APPROVAL = new Set([
 
 const INTENT_SAFE = new Set([
   'git_status',
+  'summarize_repo',
+  'explain_changes',
+  'commit_message',
+  'prepare_pr',
   'project_scan',
   'client_delivery',
   'chat',
   'copy_paste',
+  'open_app',
   'settings',
   'file_task',
 ]);

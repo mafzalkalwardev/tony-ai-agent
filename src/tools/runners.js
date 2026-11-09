@@ -61,7 +61,16 @@ function runDetected(command, { approved = false } = {}) {
 
 function runTests({ approved = false, projectPath = '.' } = {}) {
   const s = scan(projectPath);
-  return runDetected(s.testCommand, { approved });
+  let allow = approved;
+  try {
+    const prefs = require('./preferences').load();
+    if (prefs?.safety?.alwaysAllowNpmTest && /^npm\s+test\b/i.test(s.testCommand || '')) {
+      allow = true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return runDetected(s.testCommand, { approved: allow });
 }
 
 function runBuild({ approved = false, projectPath = '.' } = {}) {

@@ -141,7 +141,10 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
   const pending = approvals.list('pending');
   if (pending.length && approvals.isApprovalText(message)) {
     const item = approvals.decide(pending[0].id, true);
-    const response = `Approved: ${item.action} — ${item.command}\nRetry the action (or ask me to continue) with approval noted.`;
+    const executed = await executeApprovedAction(item, sessionId);
+    const response =
+      executed?.response ||
+      `Approved: ${item.action} — ${item.command}\nRetry the action (or ask me to continue) with approval noted.`;
     memory.appendEpisode(sessionId, 'assistant', response);
     return {
       sessionId,
@@ -149,10 +152,11 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
       intent: routed,
       safety,
       approval: item,
-      toolResults: [],
+      toolResults: executed?.toolResults || [],
       iterations: 0,
       provider: 'local',
       online: true,
+      pendingApprovals: approvals.list('pending').slice(0, 5),
     };
   }
   if (pending.length && approvals.isRejectText(message)) {
@@ -187,86 +191,26 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
     };
   }
 
+  try {
+    require('../tools/preferences').rememberCommand(message);
+  } catch {
+    /* ignore */
+  }
+
   // Fast local paths for common operator intents (no LLM required)
-  if (routed.intent === 'project_scan') {
-    const scanner = require('../tools/project_scanner');
-    const text = scanner.scanAsText('.');
-    memory.appendEpisode(sessionId, 'assistant', text);
-    return {
-      sessionId,
-      response: text,
-      intent: routed,
-      safety,
-      toolResults: [{ tool: 'project_scan', result: { ok: true } }],
-      iterations: 0,
-      provider: 'local',
-      online: true,
-    };
-  }
-  if (routed.intent === 'client_delivery') {
-    const pack = require('../tools/delivery_helper').prepareDeliveryPackage({ projectPath: '.' });
-    memory.appendEpisode(sessionId, 'assistant', pack.markdown);
-    return {
-      sessionId,
-      response: pack.markdown,
-      intent: routed,
-      safety,
-      toolResults: [{ tool: 'client_delivery', result: pack }],
-      iterations: 0,
-      provider: 'local',
-      online: true,
-    };
-  }
-  if (routed.intent === 'git_status') {
-    try {
-      const { execSync } = require('child_process');
-      const out = execSync('git status --short', {
-        cwd: config.workspaceRoot,
-        encoding: 'utf8',
-        timeout: 30000,
-      });
-      const response = out.trim() || 'Working tree clean.';
-      memory.appendEpisode(sessionId, 'assistant', response);
-      return {
-        sessionId,
-        response,
-        intent: routed,
-        safety,
-        toolResults: [{ tool: 'shell', result: { ok: true, command: 'git status --short' } }],
-        iterations: 0,
-        provider: 'local',
-        online: true,
-      };
-    } catch (e) {
-      /* fall through to LLM */
-    }
-  }
+  const localFast = await handleLocalOperatorIntent({ routed, safety, sessionId, message });
+  if (localFast) return localFast;
 
-  if (routed.intent === 'copy_paste') {
-    const clip = require('../tools/clipboard_tool').copyPaste({ mode: 'read' });
-    const response = clip.text
-      ? `Clipboard (${clip.source}):\n${String(clip.text).slice(0, 2000)}`
-      : 'Clipboard is empty.';
-    memory.appendEpisode(sessionId, 'assistant', response);
-    return {
-      sessionId,
-      response,
-      intent: routed,
-      safety,
-      toolResults: [{ tool: 'clipboard', result: clip }],
-      iterations: 0,
-      provider: 'local',
-      online: true,
-    };
-  }
-
-  if (safety.level === 'NEEDS_APPROVAL' && ['run_tests', 'build_project', 'git_push', 'git_commit'].includes(routed.intent)) {
+  if (
+    safety.level === 'NEEDS_APPROVAL' &&
+    ['run_tests', 'build_project', 'git_push', 'git_commit', 'github_pr', 'search_web'].includes(routed.intent)
+  ) {
     const pending = approvals.create({
       action: routed.intent,
-      command: routed.normalized || message,
+      command: routed.params?.searchQuery || routed.normalized || message,
       reason: safety.reason,
       sessionId,
-      meta: { category: routed.category },
+      meta: { category: routed.category, params: routed.params || {} },
     });
     const response = `Approval needed for **${routed.intent}** (${safety.reason}).\nReply **yes** / **haan** to approve, or **no** / **nahi** to cancel.\nPending id: ${pending.id}`;
     memory.appendEpisode(sessionId, 'assistant', response);
@@ -497,4 +441,158 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
   };
 }
 
-module.exports = { runAgent };
+async function executeApprovedAction(item, sessionId) {
+  const action = item?.action;
+  if (action === 'search_web' || action === 'shell' && /search/i.test(item.command || '')) {
+    const result = require('../tools/web_search').searchWeb(item.command, { open: true });
+    return {
+      response: result.ok
+        ? `Approved + opened search for **${result.query}**\n${result.url}`
+        : `Approved, but search failed: ${result.error}`,
+      toolResults: [{ tool: 'search_web', result }],
+    };
+  }
+  if (action === 'run_tests') {
+    const result = require('../tools/runners').runTests({ approved: true });
+    return {
+      response: result.ok
+        ? `Tests approved and ran:\n\`\`\`\n${(result.output || '').slice(0, 4000)}\n\`\`\``
+        : `Tests approved but failed: ${result.error || result.output || 'unknown'}`,
+      toolResults: [{ tool: 'run_tests', result }],
+    };
+  }
+  if (action === 'build_project') {
+    const result = require('../tools/runners').runBuild({ approved: true });
+    return {
+      response: result.ok
+        ? `Build approved and ran:\n\`\`\`\n${(result.output || '').slice(0, 4000)}\n\`\`\``
+        : `Build approved but failed: ${result.error || result.output || 'unknown'}`,
+      toolResults: [{ tool: 'build_project', result }],
+    };
+  }
+  if (action === 'shell' && item.command) {
+    const result = await executeTool('shell', { command: item.command, approved: true }, sessionId);
+    return {
+      response: result.ok
+        ? `Ran approved command:\n\`\`\`\n${String(result.output || '').slice(0, 4000)}\n\`\`\``
+        : `Approved command failed: ${result.error}`,
+      toolResults: [{ tool: 'shell', result }],
+    };
+  }
+  return null;
+}
+
+async function handleLocalOperatorIntent({ routed, safety, sessionId, message }) {
+  const params = routed.params || {};
+  const reply = (response, tool, result = { ok: true }) => {
+    memory.appendEpisode(sessionId, 'assistant', response);
+    return {
+      sessionId,
+      response,
+      intent: routed,
+      safety,
+      toolResults: [{ tool, result }],
+      iterations: 0,
+      provider: 'local',
+      online: true,
+      pendingApprovals: approvals.list('pending').slice(0, 5),
+    };
+  };
+
+  if (routed.intent === 'project_scan') {
+    return reply(require('../tools/project_scanner').scanAsText('.'), 'project_scan');
+  }
+  if (routed.intent === 'client_delivery') {
+    const pack = require('../tools/delivery_helper').prepareDeliveryPackage({
+      projectPath: '.',
+      completedWork: params.deliveryTopic || '',
+    });
+    return reply(pack.markdown, 'client_delivery', pack);
+  }
+  if (routed.intent === 'git_status') {
+    try {
+      const { execSync } = require('child_process');
+      const out = execSync('git status --short', {
+        cwd: config.workspaceRoot,
+        encoding: 'utf8',
+        timeout: 30000,
+      });
+      return reply(out.trim() || 'Working tree clean.', 'shell', {
+        ok: true,
+        command: 'git status --short',
+      });
+    } catch {
+      return null;
+    }
+  }
+  if (routed.intent === 'summarize_repo') {
+    const result = require('../tools/github_helper').summarizeRepo();
+    return reply(result.markdown, 'summarize_repo', result);
+  }
+  if (routed.intent === 'explain_changes') {
+    const result = require('../tools/github_helper').explainChangedFiles();
+    return reply(result.markdown, 'explain_changes', result);
+  }
+  if (routed.intent === 'commit_message') {
+    const result = require('../tools/github_helper').generateCommitMessage(params.commitTopic || '');
+    return reply(`Draft commit message:\n\n\`\`\`\n${result.message}\n\`\`\``, 'commit_message', result);
+  }
+  if (routed.intent === 'prepare_pr') {
+    const result = require('../tools/github_helper').preparePrInstructions(params.commitTopic || '');
+    return reply(result.markdown, 'prepare_pr', result);
+  }
+  if (routed.intent === 'copy_paste') {
+    const clip = require('../tools/clipboard_tool').copyPaste({ mode: 'read' });
+    return reply(
+      clip.text ? `Clipboard (${clip.source}):\n${String(clip.text).slice(0, 2000)}` : 'Clipboard is empty.',
+      'clipboard',
+      clip
+    );
+  }
+  if (routed.intent === 'open_app') {
+    const app = params.appName || 'browser';
+    const result = require('../tools/open_app').openApp(app);
+    return reply(
+      result.ok ? `Opening **${app}**…` : `Could not open ${app}: ${result.error}`,
+      'open_app',
+      result
+    );
+  }
+  if (routed.intent === 'file_task' && params.filePath) {
+    const result = await executeTool('read_file', { path: params.filePath }, sessionId);
+    if (result.ok) {
+      return reply(`# ${params.filePath}\n\n\`\`\`\n${String(result.content).slice(0, 4000)}\n\`\`\``, 'read_file', result);
+    }
+    return reply(result.error || 'Could not read file.', 'read_file', result);
+  }
+  if (routed.intent === 'settings') {
+    const prefs = require('../tools/preferences').load();
+    const stt = require('../voice/local_stt').status();
+    const response = `# Preferences
+
+- Assistant: ${prefs.assistantName}
+- User: ${prefs.userName}
+- Language: ${prefs.language}
+- Always listen: ${prefs.voice?.alwaysListen}
+- Prefer local TTS: ${prefs.voice?.preferLocalTts}
+- Prefer local STT: ${prefs.voice?.preferLocalStt}
+- Always allow npm test: ${prefs.safety?.alwaysAllowNpmTest}
+- Local STT bridge: ${stt.configured ? 'script ready' : 'missing'}
+- Recent commands: ${(prefs.recentCommands || []).slice(0, 5).map((c) => c.command).join(' | ') || 'none'}
+
+Say "project note: …" to save a note (no secrets).`;
+    return reply(response, 'preferences_get', { ok: true, preferences: prefs, stt });
+  }
+  if (/^project\s+note\s*:/i.test(message)) {
+    const note = message.replace(/^project\s+note\s*:/i, '').trim();
+    const preferences = require('../tools/preferences').addProjectNote(note);
+    return reply(
+      preferences.error || `Saved project note. Total notes: ${(preferences.projectNotes || []).length}`,
+      'preferences_update',
+      { ok: !preferences.error, preferences }
+    );
+  }
+  return null;
+}
+
+module.exports = { runAgent, handleLocalOperatorIntent };

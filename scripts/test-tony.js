@@ -126,6 +126,36 @@ async function main() {
   assert('intent copy', intentRouter.route('Tony ye copy karo').category === 'copy_paste');
   assert('intent status', intentRouter.route('Tony mujhe status batao').intent === 'git_status');
   assert('intent category map', intentRouter.route('project scan karo').category === 'project_scan');
+  assert('intent summarize repo', intentRouter.route('summarize repo').intent === 'summarize_repo');
+  assert('intent explain changes', intentRouter.route('explain changed files').intent === 'explain_changes');
+  assert('intent commit message', intentRouter.route('commit message banao').intent === 'commit_message');
+  assert('intent prepare pr', intentRouter.route('prepare pr').intent === 'prepare_pr');
+  assert('intent open vscode', intentRouter.route('VS Code kholo').intent === 'open_app');
+
+  const params = require('../src/core/params');
+  assert('param search query', params.extractSearchQuery('Tony browser mein search karo faster whisper').includes('faster whisper'));
+  assert('param app name', params.extractAppName('terminal kholo') === 'terminal');
+  assert('param file path', params.extractFilePath('read file src/config.js') === 'src/config.js');
+
+  const gh = require('../src/tools/github_helper');
+  assert('github summarize', gh.summarizeRepo().ok === true);
+  assert('github explain', gh.explainChangedFiles().ok === true);
+  assert('github commit draft', gh.generateCommitMessage('operator').message.includes('feat:'));
+  assert('github pr prep', gh.preparePrInstructions().draftOnly === true);
+
+  const web = require('../src/tools/web_search');
+  assert('web search url', web.buildSearchUrl('tony ai').includes('duckduckgo.com'));
+
+  const openApp = require('../src/tools/open_app');
+  assert('open app map', Boolean(openApp.APP_MAP.vscode));
+
+  const prefs = require('../src/tools/preferences');
+  prefs.save({ language: 'roman' });
+  assert('preferences save', prefs.load().language === 'roman');
+  assert('preferences reject secrets', Boolean(prefs.addProjectNote('api_key=supersecret').error));
+
+  const localStt = require('../src/voice/local_stt');
+  assert('local stt status', localStt.status().configured === true);
 
   const scanner = require('../src/tools/project_scanner');
   const scan = scanner.scan('.');

@@ -333,6 +333,53 @@
       loadStatus();
     });
 
+    async function operatorAction(label, fn) {
+      $$('.hud-nav-btn[data-panel="command"]')[0]?.click();
+      updateOperatorStrip({ status: 'working', task: label });
+      try {
+        const result = await fn();
+        const text = result.markdown || result.response || result.savedPath || JSON.stringify(result, null, 2);
+        addMessage('assistant', typeof text === 'string' ? text : JSON.stringify(result, null, 2));
+        updateOperatorStrip({ status: 'idle', task: label });
+      } catch (e) {
+        addMessage('assistant', `${label} failed: ${e.message}`);
+        updateOperatorStrip({ status: 'error', task: label });
+      }
+    }
+
+    $('#btnRepoSummary')?.addEventListener('click', () =>
+      operatorAction('repo summary', () => api('/api/github/summary'))
+    );
+    $('#btnExplainChanges')?.addEventListener('click', () =>
+      operatorAction('explain changes', () => api('/api/github/changes'))
+    );
+    $('#btnCommitMsg')?.addEventListener('click', () =>
+      operatorAction('commit message', () =>
+        api('/api/github/commit-message', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({
+          markdown: `\`\`\`\n${r.message}\n\`\`\``,
+        }))
+      )
+    );
+    $('#btnPreparePr')?.addEventListener('click', () =>
+      operatorAction('prepare PR', () =>
+        api('/api/github/prepare-pr', { method: 'POST', body: JSON.stringify({}) })
+      )
+    );
+    $('#btnExportDelivery')?.addEventListener('click', () =>
+      operatorAction('export delivery', () =>
+        api('/api/delivery/export', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({
+          markdown: `Saved delivery draft to \`${r.savedPath}\`\n\n${r.markdown || ''}`,
+        }))
+      )
+    );
+    $('#btnPrefs')?.addEventListener('click', () =>
+      operatorAction('preferences', () =>
+        api('/api/preferences').then((r) => ({
+          markdown: `# Preferences\n\`\`\`json\n${JSON.stringify(r.preferences, null, 2)}\n\`\`\``,
+        }))
+      )
+    );
+
     addMessage(
       'assistant',
       `**JARVIS online, ${window.tonyUserName()}.** I'm always listening — just talk, no mic click. Say **"Wake up Tony"** for your briefing. Tony Stark wit + Peter Parker heart. Marvel, Urdu novels, coding, automation — all yours.`

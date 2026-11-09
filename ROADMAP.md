@@ -33,6 +33,15 @@
 - [x] JARVIS operator strip (transcript, intent, approvals)
 - [x] Local-first TTS preference + silence threshold config
 
+## v2.9 (shipped)
+
+- [x] Parameter extraction for search/file/app/topics
+- [x] GitHub summarize / explain changes / commit + PR prep helpers
+- [x] Web search + open_app tools
+- [x] Preferences JSON (no secrets) + delivery export
+- [x] faster-whisper local STT bridge + approve-and-run actions
+- [x] Large-file overwrite approval
+
 ## v2.1 (next)
 
 - [ ] Telegram / Discord channels

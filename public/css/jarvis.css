@@ -448,3 +448,22 @@ dialog {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.operator-actions {
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  padding: 0.85rem;
+  background: rgba(0, 20, 40, 0.55);
+}
+.operator-actions h3 {
+  font-family: var(--font-hud);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.65rem;
+  color: var(--cyan);
+}
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}

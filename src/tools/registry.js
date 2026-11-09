@@ -549,9 +549,29 @@ const builtins = {
         return { ok: false, error: 'Writing .env requires approved:true after user consent' };
       }
       const full = safePath(filePath);
+      const nextBytes = Buffer.byteLength(content, 'utf8');
+      const LARGE_OVERWRITE = 200 * 1024; // 200 KB
+      if (fs.existsSync(full)) {
+        const currentBytes = fs.statSync(full).size;
+        if (currentBytes >= LARGE_OVERWRITE && !approved) {
+          const approvals = require('../safety/approvals');
+          const pending = approvals.create({
+            action: 'overwrite_large_file',
+            command: `write_file ${filePath}`,
+            reason: `Overwriting large file (${currentBytes} bytes) requires approval`,
+          });
+          return {
+            ok: false,
+            level: 'NEEDS_APPROVAL',
+            needsApproval: true,
+            pendingApprovalId: pending.id,
+            error: `Large file overwrite blocked until approved (${currentBytes} bytes).`,
+          };
+        }
+      }
       fs.mkdirSync(path.dirname(full), { recursive: true });
       fs.writeFileSync(full, content, 'utf8');
-      return { ok: true, path: filePath, bytes: Buffer.byteLength(content, 'utf8') };
+      return { ok: true, path: filePath, bytes: nextBytes };
     },
   },
 
@@ -1143,6 +1163,161 @@ builtins.clipboard = {
   },
   async execute({ text = '', mode = 'auto' } = {}) {
     return require('./clipboard_tool').copyPaste({ text, mode });
+  },
+};
+
+builtins.search_web = {
+  name: 'search_web',
+  description: 'Search the web (opens DuckDuckGo). Use for "browser mein search karo …"',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      open: { type: 'boolean', default: true },
+      approved: { type: 'boolean' },
+    },
+    required: ['query'],
+  },
+  async execute({ query, open = true, approved = false } = {}) {
+    if (!approved) {
+      const pending = require('../safety/approvals').create({
+        action: 'search_web',
+        command: query,
+        reason: 'Opening external browser search requires approval',
+      });
+      return {
+        ok: false,
+        level: 'NEEDS_APPROVAL',
+        needsApproval: true,
+        pendingApprovalId: pending.id,
+        error: 'Approve browser search first (yes/haan).',
+        previewUrl: require('./web_search').buildSearchUrl(query),
+      };
+    }
+    return require('./web_search').searchWeb(query, { open });
+  },
+};
+
+builtins.open_app = {
+  name: 'open_app',
+  description: 'Open a common local app (vscode, terminal, chrome, browser, notepad, explorer, calculator)',
+  parameters: {
+    type: 'object',
+    properties: { app: { type: 'string' } },
+    required: ['app'],
+  },
+  async execute({ app }) {
+    return require('./open_app').openApp(app);
+  },
+};
+
+builtins.summarize_repo = {
+  name: 'summarize_repo',
+  description: 'Summarize local git repository state (branch, status, recent commits). Safe/read-only.',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./github_helper').summarizeRepo();
+  },
+};
+
+builtins.explain_changes = {
+  name: 'explain_changes',
+  description: 'Explain changed/untracked files before commit or PR',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./github_helper').explainChangedFiles();
+  },
+};
+
+builtins.commit_message = {
+  name: 'commit_message',
+  description: 'Draft a commit message from local changes (does not commit)',
+  parameters: {
+    type: 'object',
+    properties: { topic: { type: 'string' } },
+  },
+  async execute({ topic = '' } = {}) {
+    return require('./github_helper').generateCommitMessage(topic);
+  },
+};
+
+builtins.prepare_pr = {
+  name: 'prepare_pr',
+  description: 'Prepare push/PR instructions and checklist (does not push)',
+  parameters: {
+    type: 'object',
+    properties: { topic: { type: 'string' } },
+  },
+  async execute({ topic = '' } = {}) {
+    return require('./github_helper').preparePrInstructions(topic);
+  },
+};
+
+builtins.preferences_get = {
+  name: 'preferences_get',
+  description: 'Read local operator preferences (no secrets)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, preferences: require('./preferences').load() };
+  },
+};
+
+builtins.preferences_update = {
+  name: 'preferences_update',
+  description: 'Update local operator preferences (rejects secret-like values)',
+  parameters: {
+    type: 'object',
+    properties: {
+      userName: { type: 'string' },
+      language: { type: 'string' },
+      projectNote: { type: 'string' },
+      alwaysAllowNpmTest: { type: 'boolean' },
+    },
+  },
+  async execute(args = {}) {
+    const prefs = require('./preferences');
+    if (args.projectNote) return { ok: true, preferences: prefs.addProjectNote(args.projectNote) };
+    const patch = {};
+    if (args.userName) patch.userName = args.userName;
+    if (args.language) patch.language = args.language;
+    if (typeof args.alwaysAllowNpmTest === 'boolean') {
+      patch.safety = { alwaysAllowNpmTest: args.alwaysAllowNpmTest };
+    }
+    return { ok: true, preferences: prefs.save(patch) };
+  },
+};
+
+builtins.export_delivery = {
+  name: 'export_delivery',
+  description: 'Generate and save a client delivery markdown file under data/reports (does not send)',
+  parameters: {
+    type: 'object',
+    properties: {
+      completedWork: { type: 'string' },
+      limitations: { type: 'string' },
+    },
+  },
+  async execute({ completedWork = '', limitations = '' } = {}) {
+    const pack = require('./delivery_helper').prepareDeliveryPackage({
+      projectPath: '.',
+      completedWork,
+      limitations,
+    });
+    const outDir = path.join(config.dataDir, 'reports');
+    fs.mkdirSync(outDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const file = path.join(outDir, `delivery_${stamp}.md`);
+    fs.writeFileSync(file, pack.markdown, 'utf8');
+    return { ...pack, savedPath: path.relative(config.workspaceRoot, file) };
+  },
+};
+
+builtins.local_stt_status = {
+  name: 'local_stt_status',
+  description: 'Show optional faster-whisper local STT bridge status',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../voice/local_stt').status() };
   },
 };
 
