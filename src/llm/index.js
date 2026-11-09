@@ -17,6 +17,7 @@ function buildChain() {
   const chain = [];
   const p = config.llmProvider;
 
+  if (p === 'mock') chain.push('mock');
   if (p === 'groq' && config.groq.apiKey) chain.push('groq');
   if (p === 'gemini' && config.gemini.apiKey) chain.push('gemini');
   if (p === 'openai' && config.openai.apiKey) chain.push('openai');
@@ -30,7 +31,8 @@ function buildChain() {
   if (config.ollama.enabled) chain.push('ollama');
   if (config.jan?.enabled) chain.push('jan');
 
-  if (!chain.length) chain.push('mock');
+  // Always keep mock as last-resort so tests and offline boots never hard-fail.
+  if (!chain.includes('mock')) chain.push('mock');
   return [...new Set(chain)];
 }
 
@@ -59,7 +61,8 @@ async function complete(messages, options = {}) {
   }
 
   let lastError;
-  const providers = online ? chain : ['ollama', 'mock'].filter((k) => k === 'ollama' || k === 'mock');
+  // Offline: local engines first, mock always last. Online: configured chain (already ends with mock).
+  const providers = online ? chain : ['ollama', 'jan', 'mock'].filter((k, i, arr) => arr.indexOf(k) === i);
 
   for (const kind of providers) {
     if (kind === 'ollama') {
@@ -70,7 +73,7 @@ async function complete(messages, options = {}) {
       const jan = require('./jan');
       if (!(await jan.isAvailable())) continue;
     }
-    if (kind !== 'mock' && kind !== 'ollama') {
+    if (kind !== 'mock' && kind !== 'ollama' && kind !== 'jan') {
       const cfg = config[kind];
       if (cfg && !cfg.apiKey) continue;
     }
@@ -80,10 +83,9 @@ async function complete(messages, options = {}) {
       return { ...result, provider: kind, online };
     } catch (e) {
       lastError = e;
-      if ((isRateLimit(e) || isNetworkError(e)) && providers.indexOf(kind) < providers.length - 1) {
-        continue;
-      }
-      if (kind === 'mock') throw e;
+      // Keep walking the chain for any failure except the final mock crash.
+      if (kind !== 'mock') continue;
+      throw e;
     }
   }
   throw lastError || new Error('No LLM provider available');

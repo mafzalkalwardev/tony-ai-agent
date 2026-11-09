@@ -9,6 +9,19 @@ function env(key, fallback = '') {
   return process.env[key] ?? fallback;
 }
 
+function loadSettingsFile() {
+  const settingsPath = path.join(root, 'config', 'settings.json');
+  try {
+    if (!fs.existsSync(settingsPath)) return {};
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+const fileSettings = loadSettingsFile();
+const voiceFile = fileSettings.voice || {};
+
 module.exports = {
   port: Number(env('PORT', '8787')),
   dataDir: path.resolve(root, env('TONY_DATA_DIR', './data')),
@@ -50,11 +63,26 @@ module.exports = {
     baseUrl: env('DEEPGRAM_BASE_URL', 'https://api.deepgram.com/v1'),
   },
   voice: {
-    minConfidence: Number(env('TONY_VOICE_MIN_CONFIDENCE', '0.55')),
-    noiseCancellation: env('TONY_VOICE_NOISE_CANCEL', 'true') === 'true',
-    highPassHz: Number(env('TONY_VOICE_HIGHPASS_HZ', '180')),
-    vadSpeechMult: Number(env('TONY_VOICE_VAD_MULT', '3.2')),
+    minConfidence: Number(
+      env('TONY_VOICE_MIN_CONFIDENCE', String(voiceFile.minConfidence ?? 0.55))
+    ),
+    noiseCancellation:
+      env('TONY_VOICE_NOISE_CANCEL', String(voiceFile.noiseCancellation ?? true)) === 'true',
+    highPassHz: Number(env('TONY_VOICE_HIGHPASS_HZ', String(voiceFile.highPassHz ?? 180))),
+    vadSpeechMult: Number(env('TONY_VOICE_VAD_MULT', String(voiceFile.vadSpeechMult ?? 3.2))),
+    silenceStopSeconds: Number(
+      env('TONY_VOICE_SILENCE_STOP_SECONDS', String(voiceFile.silenceStopSeconds ?? 1.2))
+    ),
+    silenceThreshold: Number(
+      env('TONY_VOICE_SILENCE_THRESHOLD', String(voiceFile.silenceThreshold ?? 0.015))
+    ),
+    useSilenceDetection: voiceFile.useSilenceDetection !== false,
+    preferLocalStt:
+      env('TONY_VOICE_PREFER_LOCAL_STT', String(voiceFile.preferLocalStt ?? false)) === 'true',
+    preferLocalTts:
+      env('TONY_VOICE_PREFER_LOCAL_TTS', String(voiceFile.preferLocalTts ?? true)) === 'true',
   },
+  settings: fileSettings,
   elevenlabs: {
     apiKey: env('ELEVENLABS_API_KEY'),
     voiceId: env('ELEVENLABS_VOICE_ID', '21m00Tcm4TlvDq8ikWAM'),

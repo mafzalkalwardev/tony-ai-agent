@@ -501,15 +501,27 @@ const builtins = {
     },
     async execute({ command, approved = false }) {
       const { canRunCommand } = require('../safety/policy');
+      const { logCommand } = require('./runners');
+      const approvals = require('../safety/approvals');
       const check = canRunCommand(command, { approved, unsafeMode: config.shellUnsafe });
       if (!check.allowed) {
+        let pending = null;
+        if (check.level === 'NEEDS_APPROVAL') {
+          pending = approvals.create({
+            action: 'shell',
+            command,
+            reason: check.reason,
+          });
+        }
         return {
           ok: false,
           level: check.level,
           error: check.reason,
+          pendingApprovalId: pending?.id,
           hint: check.level === 'NEEDS_APPROVAL' ? 'Ask user to approve, then retry with approved:true' : undefined,
         };
       }
+      logCommand(command, { approved, level: check.level, tool: 'shell' });
       const out = execSync(command, {
         cwd: config.workspaceRoot,
         encoding: 'utf8',
@@ -1036,6 +1048,101 @@ builtins.signalmint_conversations = {
   async execute() {
     const data = await signalmintApi('/api/conversations');
     return { ok: true, conversations: data };
+  },
+};
+
+builtins.project_scan = {
+  name: 'project_scan',
+  description: 'Scan the workspace: file tree, package.json/requirements, README, tests folder, detected test/build commands',
+  parameters: {
+    type: 'object',
+    properties: { path: { type: 'string', description: 'Relative project path', default: '.' } },
+  },
+  async execute({ path: projectPath = '.' } = {}) {
+    const scanner = require('./project_scanner');
+    const result = scanner.scan(projectPath);
+    return { ok: true, ...result, text: scanner.scanAsText(projectPath) };
+  },
+};
+
+builtins.run_tests = {
+  name: 'run_tests',
+  description: 'Run detected project tests (npm test / pytest). Requires approval unless already approved.',
+  parameters: {
+    type: 'object',
+    properties: {
+      approved: { type: 'boolean' },
+      path: { type: 'string', default: '.' },
+    },
+  },
+  async execute({ approved = false, path: projectPath = '.' } = {}) {
+    return require('./runners').runTests({ approved, projectPath });
+  },
+};
+
+builtins.build_project = {
+  name: 'build_project',
+  description: 'Run detected safe build command (e.g. npm run build). Always needs approval.',
+  parameters: {
+    type: 'object',
+    properties: {
+      approved: { type: 'boolean' },
+      path: { type: 'string', default: '.' },
+    },
+  },
+  async execute({ approved = false, path: projectPath = '.' } = {}) {
+    return require('./runners').runBuild({ approved, projectPath });
+  },
+};
+
+builtins.client_delivery = {
+  name: 'client_delivery',
+  description:
+    'Prepare a professional client delivery package (summary, setup, testing checklist, message draft). Does NOT send messages.',
+  parameters: {
+    type: 'object',
+    properties: {
+      completedWork: { type: 'string' },
+      limitations: { type: 'string' },
+      path: { type: 'string', default: '.' },
+    },
+  },
+  async execute({ completedWork = '', limitations = '', path: projectPath = '.' } = {}) {
+    return require('./delivery_helper').prepareDeliveryPackage({
+      projectPath,
+      completedWork,
+      limitations,
+    });
+  },
+};
+
+builtins.intent_route = {
+  name: 'intent_route',
+  description: 'Classify a user command into TONY intent categories (Roman Urdu / English / Hindi supported)',
+  parameters: {
+    type: 'object',
+    properties: { message: { type: 'string' } },
+    required: ['message'],
+  },
+  async execute({ message }) {
+    const routed = require('../core/intent_router').route(message);
+    return { ok: true, ...routed };
+  },
+};
+
+builtins.clipboard = {
+  name: 'clipboard',
+  description:
+    'Read or write clipboard text for copy/paste commands (Roman Urdu: "Tony ye copy karo"). Uses OS clipboard when available.',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'Text to copy; omit to read clipboard' },
+      mode: { type: 'string', enum: ['auto', 'read', 'write'], default: 'auto' },
+    },
+  },
+  async execute({ text = '', mode = 'auto' } = {}) {
+    return require('./clipboard_tool').copyPaste({ text, mode });
   },
 };
 

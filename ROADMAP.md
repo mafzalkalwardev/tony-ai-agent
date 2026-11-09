@@ -25,6 +25,14 @@
 - [x] Voice WebSocket + REST endpoints
 - [x] GitHub CI workflow
 
+## v2.8 (shipped)
+
+- [x] Intent router + Roman Urdu operator commands
+- [x] Expanded safety (deploy, voice-clone block, approval queue)
+- [x] Project scanner + test/build runners + delivery helper
+- [x] JARVIS operator strip (transcript, intent, approvals)
+- [x] Local-first TTS preference + silence threshold config
+
 ## v2.1 (next)
 
 - [ ] Telegram / Discord channels
@@ -32,6 +40,7 @@
 - [ ] Streaming Groq + ElevenLabs responses
 - [ ] Obsidian sync with live vault watcher
 - [ ] MCP server mode for Cursor integration
+- [ ] Optional faster-whisper local STT when Deepgram offline
 
 ## v3.0 (vision)
 

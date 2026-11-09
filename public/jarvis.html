@@ -53,6 +53,13 @@
           </div>
           <button type="button" class="hud-speaker active" id="speakerBtn" title="Voice output">🔊</button>
         </div>
+        <div class="operator-strip" id="operatorStrip">
+          <div class="op-cell"><span>STATUS</span><strong id="opStatus">idle</strong></div>
+          <div class="op-cell"><span>TRANSCRIPT</span><strong id="opTranscript">—</strong></div>
+          <div class="op-cell"><span>INTENT</span><strong id="opIntent">—</strong></div>
+          <div class="op-cell"><span>TASK</span><strong id="opTask">—</strong></div>
+          <div class="op-approvals" id="opApprovals"></div>
+        </div>
         <div class="messages" id="messages"></div>
         <form class="hud-composer" id="chatForm">
           <input type="text" id="chatInput" placeholder="Command TONY… code, build, research, deploy" autofocus />

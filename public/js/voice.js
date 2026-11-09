@@ -188,10 +188,12 @@
     if (!Gate) return startDeepgramChunkListenLegacy();
 
     try {
+      const voiceCfg = window.tonyStatus?.voice || {};
       Voice.voiceGate = new Gate({
-        speechMult: 3.2,
-        highPassHz: 180,
-        minRms: 0.014,
+        speechMult: voiceCfg.vadSpeechMult ?? 3.2,
+        highPassHz: voiceCfg.highPassHz ?? 180,
+        minRms: voiceCfg.silenceThreshold ?? 0.014,
+        silenceMs: Math.round((voiceCfg.silenceStopSeconds ?? 1.2) * 1000),
       });
 
       await Voice.voiceGate.start(async (blob, mime) => {
@@ -505,6 +507,7 @@
 
   async function processTranscript(transcript) {
     window.tonyAddMessage?.('user', `🎤 ${transcript}`);
+    window.tonyUpdateOperator?.({ transcript, status: 'listening→thinking', task: 'voice' });
 
     if (/wake\s*up,?\s*tony|utho\s*tony|jaag\s*ja\s*tony/i.test(transcript)) {
       setVoiceState('thinking', 'TONY is waking up…');
@@ -514,6 +517,12 @@
       });
       if (wake.sessionId) localStorage.setItem('tony_session_id', wake.sessionId);
       window.tonyAddMessage?.('assistant', wake.response);
+      window.tonyUpdateOperator?.({
+        transcript,
+        intent: { category: 'settings', intent: 'wake' },
+        status: 'idle',
+        task: 'wake briefing',
+      });
       if (Voice.voiceOut) await speakResponse(wake.response);
       setVoiceState('ready', 'TONY is online');
       return;
@@ -546,6 +555,15 @@
     if (result.sessionId) {
       localStorage.setItem('tony_session_id', result.sessionId);
     }
+
+    window.tonyUpdateOperator?.({
+      transcript,
+      intent: result.intent,
+      safety: result.safety,
+      task: result.toolResults?.map((t) => t.tool).join(', ') || 'reply',
+      status: result.pendingApprovals?.length ? 'awaiting approval' : 'idle',
+      pendingApprovals: result.pendingApprovals,
+    });
 
     window.tonyAddMessage?.(
       'assistant',

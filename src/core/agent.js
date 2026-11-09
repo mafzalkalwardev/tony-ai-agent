@@ -22,6 +22,9 @@ const {
   trimMessages,
   isContextLengthError,
 } = require('../llm/context-budget');
+const intentRouter = require('./intent_router');
+const { classifyIntent } = require('../safety/policy');
+const approvals = require('../safety/approvals');
 
 function wantsTaskRecord(message) {
   return /remember this task|record this task|save this task|yaad rakh|task save/i.test(message);
@@ -131,6 +134,156 @@ Use learned habits and mood patterns from memory. Wake phrase "Wake up Tony" tri
 async function runAgent({ sessionId, message, forceOffline = false }) {
   memory.appendEpisode(sessionId, 'user', message);
 
+  const routed = intentRouter.route(message);
+  const safety = classifyIntent(routed.intent, message);
+
+  // Resolve pending approvals via short yes/no replies
+  const pending = approvals.list('pending');
+  if (pending.length && approvals.isApprovalText(message)) {
+    const item = approvals.decide(pending[0].id, true);
+    const response = `Approved: ${item.action} — ${item.command}\nRetry the action (or ask me to continue) with approval noted.`;
+    memory.appendEpisode(sessionId, 'assistant', response);
+    return {
+      sessionId,
+      response,
+      intent: routed,
+      safety,
+      approval: item,
+      toolResults: [],
+      iterations: 0,
+      provider: 'local',
+      online: true,
+    };
+  }
+  if (pending.length && approvals.isRejectText(message)) {
+    const item = approvals.decide(pending[0].id, false);
+    const response = `Cancelled: ${item.action} — ${item.command}`;
+    memory.appendEpisode(sessionId, 'assistant', response);
+    return {
+      sessionId,
+      response,
+      intent: routed,
+      safety,
+      approval: item,
+      toolResults: [],
+      iterations: 0,
+      provider: 'local',
+      online: true,
+    };
+  }
+
+  if (safety.level === 'BLOCKED') {
+    const response = `Blocked for safety: ${safety.reason}`;
+    memory.appendEpisode(sessionId, 'assistant', response);
+    return {
+      sessionId,
+      response,
+      intent: routed,
+      safety,
+      toolResults: [],
+      iterations: 0,
+      provider: 'local',
+      online: true,
+    };
+  }
+
+  // Fast local paths for common operator intents (no LLM required)
+  if (routed.intent === 'project_scan') {
+    const scanner = require('../tools/project_scanner');
+    const text = scanner.scanAsText('.');
+    memory.appendEpisode(sessionId, 'assistant', text);
+    return {
+      sessionId,
+      response: text,
+      intent: routed,
+      safety,
+      toolResults: [{ tool: 'project_scan', result: { ok: true } }],
+      iterations: 0,
+      provider: 'local',
+      online: true,
+    };
+  }
+  if (routed.intent === 'client_delivery') {
+    const pack = require('../tools/delivery_helper').prepareDeliveryPackage({ projectPath: '.' });
+    memory.appendEpisode(sessionId, 'assistant', pack.markdown);
+    return {
+      sessionId,
+      response: pack.markdown,
+      intent: routed,
+      safety,
+      toolResults: [{ tool: 'client_delivery', result: pack }],
+      iterations: 0,
+      provider: 'local',
+      online: true,
+    };
+  }
+  if (routed.intent === 'git_status') {
+    try {
+      const { execSync } = require('child_process');
+      const out = execSync('git status --short', {
+        cwd: config.workspaceRoot,
+        encoding: 'utf8',
+        timeout: 30000,
+      });
+      const response = out.trim() || 'Working tree clean.';
+      memory.appendEpisode(sessionId, 'assistant', response);
+      return {
+        sessionId,
+        response,
+        intent: routed,
+        safety,
+        toolResults: [{ tool: 'shell', result: { ok: true, command: 'git status --short' } }],
+        iterations: 0,
+        provider: 'local',
+        online: true,
+      };
+    } catch (e) {
+      /* fall through to LLM */
+    }
+  }
+
+  if (routed.intent === 'copy_paste') {
+    const clip = require('../tools/clipboard_tool').copyPaste({ mode: 'read' });
+    const response = clip.text
+      ? `Clipboard (${clip.source}):\n${String(clip.text).slice(0, 2000)}`
+      : 'Clipboard is empty.';
+    memory.appendEpisode(sessionId, 'assistant', response);
+    return {
+      sessionId,
+      response,
+      intent: routed,
+      safety,
+      toolResults: [{ tool: 'clipboard', result: clip }],
+      iterations: 0,
+      provider: 'local',
+      online: true,
+    };
+  }
+
+  if (safety.level === 'NEEDS_APPROVAL' && ['run_tests', 'build_project', 'git_push', 'git_commit'].includes(routed.intent)) {
+    const pending = approvals.create({
+      action: routed.intent,
+      command: routed.normalized || message,
+      reason: safety.reason,
+      sessionId,
+      meta: { category: routed.category },
+    });
+    const response = `Approval needed for **${routed.intent}** (${safety.reason}).\nReply **yes** / **haan** to approve, or **no** / **nahi** to cancel.\nPending id: ${pending.id}`;
+    memory.appendEpisode(sessionId, 'assistant', response);
+    return {
+      sessionId,
+      response,
+      intent: routed,
+      safety,
+      approval: pending,
+      pendingApprovals: approvals.list('pending').slice(0, 5),
+      toolResults: [],
+      iterations: 0,
+      provider: 'local',
+      online: true,
+    };
+  }
+
   if (config.companion.enabled && companion.isWakePhrase(message)) {
     const wake = await companion.generateWakeResponse({ sessionId, message });
     memory.appendEpisode(sessionId, 'assistant', wake.response);
@@ -141,6 +294,8 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
       mood: wake.mood,
       persona: wake.persona,
       brief: wake.brief,
+      intent: routed,
+      safety,
       toolResults: [],
       iterations: 0,
       provider: wake.provider || config.llmProvider,
@@ -316,10 +471,24 @@ async function runAgent({ sessionId, message, forceOffline = false }) {
     finalContent += `\n\n_(Task recorded as "${recorded.name}" — say "repeat ${recorded.name}" to run offline)_`;
   }
 
+  // Surface approval needs from tool results
+  const needsApproval = toolResults.find((t) => t.result?.needsApproval || t.result?.level === 'NEEDS_APPROVAL');
+  if (needsApproval && !needsApproval.result?.pendingApprovalId) {
+    approvals.create({
+      action: needsApproval.tool,
+      command: needsApproval.args?.command || needsApproval.tool,
+      reason: needsApproval.result?.error || needsApproval.result?.hint || 'Approval required',
+      sessionId,
+    });
+  }
+
   return {
     sessionId,
     response: finalContent,
     plan: planResult,
+    intent: routed,
+    safety,
+    pendingApprovals: approvals.list('pending').slice(0, 5),
     toolResults,
     attachments: require('../gateway/attachments').extractAttachments(toolResults),
     iterations,

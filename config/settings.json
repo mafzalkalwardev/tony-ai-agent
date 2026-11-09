@@ -1,0 +1,26 @@
+{
+  "assistant_name": "TONY",
+  "voice": {
+    "noiseCancellation": true,
+    "minConfidence": 0.55,
+    "highPassHz": 180,
+    "vadSpeechMult": 3.2,
+    "silenceStopSeconds": 1.2,
+    "silenceThreshold": 0.015,
+    "useSilenceDetection": true,
+    "preferLocalStt": false,
+    "preferLocalTts": true
+  },
+  "safety": {
+    "requireApprovalForGitPush": true,
+    "requireApprovalForGitCommit": true,
+    "requireApprovalForBuild": true,
+    "requireApprovalForDeploy": true,
+    "requireApprovalForClientSend": true,
+    "blockVoiceCloneWithoutConsent": true
+  },
+  "operator": {
+    "autoRunSafeIntents": true,
+    "logCommands": true
+  }
+}

@@ -42,8 +42,12 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.7.0',
+    version: '2.8.0',
     llm: config.llmProvider,
+    operator: {
+      categories: require('../core/intent_router').CATEGORIES,
+      pendingApprovals: require('../safety/approvals').list('pending').length,
+    },
     llmChain: require('../llm').providerStatus(),
     online,
     connectivity: connStatus(),
@@ -60,6 +64,12 @@ app.get('/health', async (_req, res) => {
       noiseCancellation: config.voice.noiseCancellation,
       minConfidence: config.voice.minConfidence,
       highPassHz: config.voice.highPassHz,
+      silenceStopSeconds: config.voice.silenceStopSeconds,
+      silenceThreshold: config.voice.silenceThreshold,
+      useSilenceDetection: config.voice.useSilenceDetection !== false,
+      vadSpeechMult: config.voice.vadSpeechMult,
+      preferLocalStt: config.voice.preferLocalStt,
+      preferLocalTts: config.voice.preferLocalTts,
     },
     skills: require('../skills/loader').listSkills().length,
     tools: require('../tools/registry').listTools().length,
@@ -356,6 +366,59 @@ app.get('/api/local/status', auth, async (_req, res) => {
     tasks: require('../tasks/store').list().length,
     llm: require('../llm').providerStatus(),
   });
+});
+
+app.post('/api/intent/route', auth, (req, res) => {
+  const { message } = req.body || {};
+  if (!message) return res.status(400).json({ error: 'message required' });
+  const routed = require('../core/intent_router').route(message);
+  const safety = require('../safety/policy').classifyIntent(routed.intent, message);
+  res.json({ ok: true, ...routed, safety });
+});
+
+app.get('/api/operator/status', auth, (_req, res) => {
+  const approvals = require('../safety/approvals');
+  res.json({
+    ok: true,
+    pendingApprovals: approvals.list('pending').slice(0, 10),
+    categories: require('../core/intent_router').CATEGORIES,
+    voice: {
+      noiseCancellation: config.voice.noiseCancellation,
+      minConfidence: config.voice.minConfidence,
+      silenceStopSeconds: config.voice.silenceStopSeconds,
+      silenceThreshold: config.voice.silenceThreshold,
+      preferLocalStt: config.voice.preferLocalStt,
+    },
+  });
+});
+
+app.get('/api/approvals', auth, (req, res) => {
+  const status = req.query.status || 'pending';
+  res.json({ ok: true, approvals: require('../safety/approvals').list(status) });
+});
+
+app.post('/api/approvals/:id', auth, (req, res) => {
+  const approved = Boolean(req.body?.approved);
+  const item = require('../safety/approvals').decide(req.params.id, approved);
+  if (!item) return res.status(404).json({ error: 'Approval not found' });
+  res.json({ ok: true, approval: item });
+});
+
+app.get('/api/project/scan', auth, (req, res) => {
+  const projectPath = req.query.path || '.';
+  const scanner = require('../tools/project_scanner');
+  res.json({ ok: true, ...scanner.scan(projectPath), text: scanner.scanAsText(projectPath) });
+});
+
+app.post('/api/delivery/prepare', auth, (req, res) => {
+  const { completedWork, limitations, path: projectPath = '.' } = req.body || {};
+  res.json(
+    require('../tools/delivery_helper').prepareDeliveryPackage({
+      projectPath,
+      completedWork,
+      limitations,
+    })
+  );
 });
 
 app.get('/', (_req, res) => {

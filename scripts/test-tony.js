@@ -8,7 +8,7 @@ process.env.TONY_DATA_DIR = process.env.TONY_DATA_DIR || './data-test';
 const { runAgent } = require('../src/core/agent');
 const memory = require('../src/memory');
 const { listSkills } = require('../src/skills/loader');
-const { listTools } = require('../src/tools/registry');
+const { listTools, getTool } = require('../src/tools/registry');
 
 let passed = 0;
 let failed = 0;
@@ -109,9 +109,49 @@ async function main() {
   const daemon = require('../src/daemon/index');
   assert('24/7 daemon', typeof daemon.runDaemon === 'function');
 
-  const { classifyCommand, canRunCommand } = require('../src/safety/policy');
+  const { classifyCommand, canRunCommand, classifyIntent, voiceCloneConsentRequired } = require('../src/safety/policy');
   assert('safety blocks rm -rf', classifyCommand('rm -rf /').level === 'BLOCKED');
   assert('safety allows git status', canRunCommand('git status').allowed === true);
+  assert('safety build needs approval', classifyCommand('npm run build').level === 'NEEDS_APPROVAL');
+  assert('safety blocks voice clone', classifyCommand('clone voice like my client').level === 'BLOCKED');
+  assert('voice clone consent flag', voiceCloneConsentRequired('please clone voice') === true);
+  assert('intent push needs approval', classifyIntent('git_push').level === 'NEEDS_APPROVAL');
+  assert('intent scan safe', classifyIntent('project_scan').level === 'SAFE');
+
+  const intentRouter = require('../src/core/intent_router');
+  assert('intent repo check', intentRouter.route('Tony repo check karo').intent === 'git_status');
+  assert('intent test run', intentRouter.route('Tony test run karo').intent === 'run_tests');
+  assert('intent client message', intentRouter.route('Tony client ke liye message banao').category === 'client_delivery');
+  assert('intent browser search', intentRouter.route('Tony browser mein search karo').intent === 'search_web');
+  assert('intent copy', intentRouter.route('Tony ye copy karo').category === 'copy_paste');
+  assert('intent status', intentRouter.route('Tony mujhe status batao').intent === 'git_status');
+  assert('intent category map', intentRouter.route('project scan karo').category === 'project_scan');
+
+  const scanner = require('../src/tools/project_scanner');
+  const scan = scanner.scan('.');
+  assert('project scanner type', Boolean(scan.projectType));
+  assert('project scanner tree', Array.isArray(scan.fileTree) && scan.fileTree.length > 0);
+  assert('project scanner text', scanner.scanAsText('.').includes('Project Scan'));
+
+  const delivery = require('../src/tools/delivery_helper').prepareDeliveryPackage({ projectPath: '.' });
+  assert('delivery draft only', delivery.draftOnly === true && delivery.clientMessage.includes('Best regards'));
+
+  const clipboard = require('../src/tools/clipboard_tool');
+  assert('clipboard write', clipboard.writeClipboard('tony-clipboard-test').ok === true);
+  assert(
+    'clipboard read',
+    String(clipboard.readClipboard().text || '').includes('tony-clipboard-test')
+  );
+  assert('clipboard tool registered', Boolean(getTool('clipboard')));
+  assert('project_scan tool registered', Boolean(getTool('project_scan')));
+  assert('client_delivery tool registered', Boolean(getTool('client_delivery')));
+  assert('voice silence from settings', require('../src/config').voice.silenceStopSeconds === 1.2);
+
+  const approvals = require('../src/safety/approvals');
+  const pending = approvals.create({ action: 'shell', command: 'git push', reason: 'test' });
+  assert('approval queue', Boolean(pending.id));
+  assert('approval yes text', approvals.isApprovalText('haan'));
+  assert('approval decide', approvals.decide(pending.id, false).status === 'rejected');
 
   const codegraph = require('../src/brain/codegraph');
   const cgStatus = codegraph.status();

@@ -123,6 +123,7 @@
   async function loadStatus() {
     try {
       const h = await fetch('/health').then((r) => r.json());
+      window.tonyStatus = h;
       $('#statBrain').textContent = (h.llm || 'groq').toUpperCase();
       $('#statTools').textContent = h.tools || '—';
       $('#statGraph').textContent = h.mind?.graphify?.nodes || h.codegraph?.nodes || '—';
@@ -162,8 +163,74 @@
     }
   }
 
+  function updateOperatorStrip({ transcript, intent, safety, task, status, pendingApprovals }) {
+    if ($('#opStatus')) $('#opStatus').textContent = status || 'idle';
+    if ($('#opTranscript') && transcript != null) {
+      $('#opTranscript').textContent = String(transcript).slice(0, 80) || '—';
+    }
+    if ($('#opIntent') && intent) {
+      const cat = intent.category || intent.intent || 'unknown';
+      const name = intent.intent || '';
+      const level = safety?.level ? ` · ${safety.level}` : '';
+      $('#opIntent').textContent = `${cat}/${name}${level}`;
+    }
+    if ($('#opTask')) $('#opTask').textContent = task || '—';
+    const box = $('#opApprovals');
+    if (!box) return;
+    const items = pendingApprovals || [];
+    if (!items.length) {
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML = items
+      .slice(0, 3)
+      .map(
+        (a) => `<div class="approval-chip" data-id="${a.id}">
+          <span title="${(a.command || a.action || '').replace(/"/g, '&quot;')}">${(a.action || 'action').slice(0, 18)}</span>
+          <button type="button" data-approve="1">YES</button>
+          <button type="button" class="reject" data-approve="0">NO</button>
+        </div>`
+      )
+      .join('');
+    box.querySelectorAll('button[data-approve]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const chip = btn.closest('.approval-chip');
+        const id = chip?.dataset.id;
+        if (!id) return;
+        try {
+          await api(`/api/approvals/${id}`, {
+            method: 'POST',
+            body: JSON.stringify({ approved: btn.dataset.approve === '1' }),
+          });
+          await refreshApprovals();
+          addMessage(
+            'assistant',
+            btn.dataset.approve === '1'
+              ? `Approved pending action ${id.slice(0, 8)}…`
+              : `Rejected pending action ${id.slice(0, 8)}…`
+          );
+        } catch (e) {
+          addMessage('assistant', `Approval error: ${e.message}`);
+        }
+      });
+    });
+  }
+
+  async function refreshApprovals() {
+    try {
+      const data = await api('/api/operator/status');
+      updateOperatorStrip({
+        status: data.pendingApprovals?.length ? 'awaiting approval' : $('#opStatus')?.textContent || 'idle',
+        pendingApprovals: data.pendingApprovals,
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function sendChat(text) {
     addMessage('user', text);
+    updateOperatorStrip({ transcript: text, status: 'thinking', task: 'routing' });
     const thinking = document.createElement('div');
     thinking.className = 'msg thinking';
     thinking.textContent = 'Processing…';
@@ -176,6 +243,15 @@
       thinking.remove();
       sessionId = result.sessionId || sessionId;
       localStorage.setItem(SESSION_KEY, sessionId);
+      const running = result.toolResults?.map((t) => t.tool).join(', ') || 'reply';
+      updateOperatorStrip({
+        transcript: text,
+        intent: result.intent,
+        safety: result.safety,
+        task: running,
+        status: result.pendingApprovals?.length ? 'awaiting approval' : 'idle',
+        pendingApprovals: result.pendingApprovals,
+      });
       addMessage(
         'assistant',
         result.response || '(no response)',
@@ -185,6 +261,7 @@
       if (window.tonyVoice?.Voice?.voiceOut) await window.tonyVoice.speakResponse(result.response);
     } catch (e) {
       thinking.remove();
+      updateOperatorStrip({ status: 'error', task: '—' });
       addMessage('assistant', `Error: ${e.message}`);
     }
   }
@@ -212,8 +289,11 @@
     tickClock();
     setInterval(tickClock, 1000);
     loadStatus();
+    refreshApprovals();
     setInterval(loadStatus, 30000);
+    setInterval(refreshApprovals, 15000);
     window.tonyVoice?.initVoice();
+    window.tonyUpdateOperator = updateOperatorStrip;
 
     $('#chatForm').addEventListener('submit', (e) => {
       e.preventDefault();
