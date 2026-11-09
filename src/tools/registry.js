@@ -1752,6 +1752,76 @@ builtins.daily_briefing = {
   },
 };
 
+builtins.vault_watch_status = {
+  name: 'vault_watch_status',
+  description: 'Show Obsidian vault live-watcher status and recent note events',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../brain/vault_watcher').status() };
+  },
+};
+
+builtins.vault_watch_start = {
+  name: 'vault_watch_start',
+  description: 'Start live Obsidian vault watcher',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('../brain/vault_watcher').start();
+  },
+};
+
+builtins.vault_sync_index = {
+  name: 'vault_sync_index',
+  description: 'Write vault watch log + refresh agentic brain index snapshot',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('../brain/vault_watcher').syncIndex();
+  },
+};
+
+builtins.prefs_vault_seal = {
+  name: 'prefs_vault_seal',
+  description: 'Seal live preferences into encrypted vault (requires TONY_PREFS_SECRET)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./pref_vault').sealFromLivePrefs();
+  },
+};
+
+builtins.prefs_vault_open = {
+  name: 'prefs_vault_open',
+  description: 'Open encrypted preference vault and restore into live prefs',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./pref_vault').restoreIntoLivePrefs();
+  },
+};
+
+builtins.generate_skill = {
+  name: 'generate_skill',
+  description: 'Draft a SKILL.md from successful procedural playbooks (optionally write to skills/)',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      query: { type: 'string' },
+      write: { type: 'boolean' },
+    },
+  },
+  async execute({ name, query, write = false } = {}) {
+    return require('../skills/generate').draftFromPlaybooks({ name, query, write });
+  },
+};
+
+builtins.tony_mcp_status = {
+  name: 'tony_mcp_status',
+  description: 'Show TONY MCP tool-server status for Cursor integration',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../mcp/tony-server').status() };
+  },
+};
+
 builtins.memorial_voice_register = {
   name: 'memorial_voice_register',
   description:

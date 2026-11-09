@@ -42,7 +42,7 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.12.0',
+    version: '2.13.0',
     llm: config.llmProvider,
     operator: {
       categories: require('../core/intent_router').CATEGORIES,
@@ -55,6 +55,9 @@ app.get('/health', async (_req, res) => {
       workspace: require('../tools/workspaces').list(),
       rateLimits: require('../safety/rate_limit').status(),
       remindersDue: require('../tools/reminders').dueNow().length,
+      vaultWatch: require('../brain/vault_watcher').status(),
+      prefsVault: require('../tools/pref_vault').status(),
+      tonyMcp: require('../mcp/tony-server').status(),
     },
     llmChain: require('../llm').providerStatus(),
     online,
@@ -98,6 +101,52 @@ app.post('/api/chat', auth, async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/chat/stream', auth, async (req, res) => {
+  const { writeSse, chunkText, streamGroq } = require('../llm/stream');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+  try {
+    const { message, sessionId = randomUUID(), mode = 'agent' } = req.body || {};
+    if (!message) {
+      writeSse(res, 'error', { error: 'message required' });
+      return res.end();
+    }
+    writeSse(res, 'status', { state: 'thinking', sessionId });
+    if (mode === 'llm') {
+      let full = '';
+      try {
+        for await (const delta of streamGroq([{ role: 'user', content: message }])) {
+          full += delta;
+          writeSse(res, 'delta', { text: delta });
+        }
+      } catch {
+        for await (const delta of chunkText('Streaming unavailable; use /api/chat.')) {
+          full += delta;
+          writeSse(res, 'delta', { text: delta });
+        }
+      }
+      writeSse(res, 'done', { sessionId, response: full, provider: 'stream' });
+      return res.end();
+    }
+    const result = await runAgent({ sessionId, message });
+    for await (const delta of chunkText(result.response || '')) {
+      writeSse(res, 'delta', { text: delta });
+    }
+    writeSse(res, 'done', {
+      sessionId,
+      response: result.response,
+      intent: result.intent,
+      provider: result.provider,
+    });
+    res.end();
+  } catch (e) {
+    writeSse(res, 'error', { error: e.message });
+    res.end();
   }
 });
 
@@ -585,6 +634,57 @@ app.get('/api/briefing', auth, (_req, res) => {
   res.json(require('../tools/reminders').dailyBriefing());
 });
 
+app.get('/api/vault/watch', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../brain/vault_watcher').status() });
+});
+
+app.post('/api/vault/watch', auth, (req, res) => {
+  const watcher = require('../brain/vault_watcher');
+  const action = req.body?.action || 'start';
+  if (action === 'stop') return res.json(watcher.stop());
+  if (action === 'sync') return res.json(watcher.syncIndex());
+  return res.json(watcher.start());
+});
+
+app.get('/api/prefs-vault', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../tools/pref_vault').status() });
+});
+
+app.post('/api/prefs-vault', auth, (req, res) => {
+  const vault = require('../tools/pref_vault');
+  const action = req.body?.action || 'seal';
+  if (action === 'open' || action === 'restore') return res.json(vault.restoreIntoLivePrefs());
+  return res.json(vault.sealFromLivePrefs());
+});
+
+app.post('/api/skills/generate', auth, (req, res) => {
+  res.json(
+    require('../skills/generate').draftFromPlaybooks({
+      name: req.body?.name,
+      query: req.body?.query,
+      write: Boolean(req.body?.write),
+    })
+  );
+});
+
+app.get('/api/mcp/tony/tools', auth, (_req, res) => {
+  res.json({ ok: true, tools: require('../mcp/tony-server').listMcpTools() });
+});
+
+app.post('/api/mcp/tony/call', auth, async (req, res) => {
+  try {
+    const { name, arguments: args = {}, sessionId = 'mcp' } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'name required' });
+    res.json(await require('../mcp/tony-server').callMcpTool(name, args, sessionId));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/mcp/tony/status', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../mcp/tony-server').status() });
+});
+
 app.get('/api/memorial-voice', auth, (_req, res) => {
   const memorial = require('../voice/memorial_voice');
   res.json({ ok: true, ...memorial.status(), voices: memorial.listVoices() });
@@ -722,6 +822,12 @@ wss.on('connection', (ws, req) => {
       if (msg.type === 'chat' && msg.message) {
         ws.send(JSON.stringify({ type: 'thinking' }));
         const result = await runAgent({ sessionId, message: msg.message });
+        if (msg.stream) {
+          const { chunkText } = require('../llm/stream');
+          for await (const delta of chunkText(result.response || '')) {
+            ws.send(JSON.stringify({ type: 'delta', text: delta }));
+          }
+        }
         ws.send(JSON.stringify({ type: 'response', ...result }));
         return;
       }
@@ -752,6 +858,12 @@ if (require.main === module) {
         .startPolling()
         .then((r) => console.log('Telegram polling:', r.ok ? 'on' : r.error))
         .catch((e) => console.warn('Telegram polling failed:', e.message));
+    }
+    try {
+      const watch = require('../brain/vault_watcher').start();
+      if (watch.ok) console.log('Obsidian vault watcher: on');
+    } catch (e) {
+      console.warn('Vault watcher:', e.message);
     }
   });
 }

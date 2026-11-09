@@ -137,6 +137,37 @@ const RULES = [
     ],
   },
   {
+    category: 'settings',
+    intent: 'vault_watch',
+    patterns: [
+      /\bvault\s+watch\b/i,
+      /\bwatch\s+vault\b/i,
+      /\bobsidian\s+watch\b/i,
+      /\bsync\s+vault\b/i,
+      /\bvault\s+sync\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'generate_skill',
+    patterns: [
+      /\bgenerate\s+skill\b/i,
+      /\bdraft\s+skill\b/i,
+      /\bskill\s+(banao|draft|generate)\b/i,
+      /\bnew\s+skill\s+from\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'prefs_vault',
+    patterns: [
+      /\bencrypt\s+prefs\b/i,
+      /\bprefs?\s+vault\b/i,
+      /\bseal\s+preferences\b/i,
+      /\brestore\s+prefs\s+vault\b/i,
+    ],
+  },
+  {
     category: 'run_tests',
     intent: 'run_tests',
     patterns: [

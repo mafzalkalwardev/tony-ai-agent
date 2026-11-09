@@ -1,6 +1,6 @@
 # TONY — Operator Roadmap
 
-Last updated: 2026-11-09 (v2.12)
+Last updated: 2026-11-09 (v2.13)
 
 Incremental improvements only. Do not rebuild from scratch.
 
@@ -33,12 +33,16 @@ Incremental improvements only. Do not rebuild from scratch.
 - [x] Per-tool rate limits for shell / outbound messaging
 - [x] Local reminders + daily briefing
 - [x] Calibrate browser always-listen with silenceStopSeconds from settings
+- [x] Obsidian vault live watcher
+- [x] Streaming chat SSE/WS deltas
+- [x] Encrypted preference vault option
+- [x] Skill drafts from successful traces
+- [x] TONY MCP tool server for Cursor
 
 ## Next
 
 ### Hardening
-- [ ] Encrypted preference vault option
-- [ ] Streaming chat/TTS responses
+- [ ] Streaming ElevenLabs TTS audio chunks
 - [ ] Vector embeddings for semantic search
 
 ## New demos

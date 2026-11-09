@@ -92,6 +92,10 @@ module.exports = {
   obsidian: {
     vaultPath: env('OBSIDIAN_VAULT_PATH', path.join(root, 'vault')),
     brainFolder: env('OBSIDIAN_BRAIN_FOLDER', 'Agentic Brain'),
+    watch: env('TONY_OBSIDIAN_WATCH', 'true') === 'true',
+  },
+  prefsVault: {
+    secret: env('TONY_PREFS_SECRET', ''),
   },
   mcp: {
     perplexity: {

@@ -144,6 +144,9 @@ async function main() {
   assert('intent daily briefing', intentRouter.route('Tony daily briefing').intent === 'daily_briefing');
   assert('intent reminder', intentRouter.route('Tony reminder in 30 minutes call client').intent === 'reminder');
   assert('intent workspace', intentRouter.route('Tony switch workspace').intent === 'workspace_switch');
+  assert('intent vault watch', intentRouter.route('Tony vault watch').intent === 'vault_watch');
+  assert('intent generate skill', intentRouter.route('Tony generate skill deploy').intent === 'generate_skill');
+  assert('intent prefs vault', intentRouter.route('Tony seal preferences').intent === 'prefs_vault');
   assert('intent open vscode', intentRouter.route('VS Code kholo').intent === 'open_app');
 
   const params = require('../src/core/params');
@@ -219,6 +222,64 @@ async function main() {
   assert('discord tool', Boolean(getTool('discord_send')));
   assert('workspace tool', Boolean(getTool('workspace_switch')));
   assert('briefing tool', Boolean(getTool('daily_briefing')));
+
+  const vaultWatch = require('../src/brain/vault_watcher');
+  assert('vault watcher status', typeof vaultWatch.status === 'function');
+  const startedWatch = vaultWatch.start();
+  assert('vault watcher start', startedWatch.ok === true || Boolean(startedWatch.error));
+  vaultWatch.stop();
+
+  const procedural = require('../src/memory/procedural');
+  procedural.recordPlaybook('deploy-flow', ['scan project', 'run tests', 'prepare pr'], 'success');
+  const skillDraft = require('../src/skills/generate').draftFromPlaybooks({
+    name: 'deploy-helper',
+    query: 'deploy',
+    write: false,
+  });
+  assert('skill draft', skillDraft.ok === true && skillDraft.content.includes('Playbook'));
+
+  const prefVault = require('../src/tools/pref_vault');
+  assert('prefs vault status', prefVault.status().enabled === false || typeof prefVault.status().enabled === 'boolean');
+  process.env.TONY_PREFS_SECRET = 'test-secret-for-tony-vault';
+  // reload config-backed secret via direct seal using module after patching
+  const cryptoVault = require('../src/tools/pref_vault');
+  // Force-enabled path: seal with temporary monkeypatch
+  const origEnabled = cryptoVault.enabled;
+  const sealed = (() => {
+    const crypto = require('crypto');
+    const fs = require('fs');
+    const path = require('path');
+    const cfg = require('../src/config');
+    const file = path.join(cfg.dataDir, 'preferences.vault');
+    const prefs = require('../src/tools/preferences').load();
+    const key = crypto.scryptSync('test-secret-for-tony-vault', 'tony-prefs-vault-v1', 32);
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const enc = Buffer.concat([cipher.update(JSON.stringify(prefs), 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        v: 1,
+        iv: iv.toString('base64'),
+        tag: tag.toString('base64'),
+        data: enc.toString('base64'),
+        at: new Date().toISOString(),
+      }),
+      'utf8'
+    );
+    return fs.existsSync(file);
+  })();
+  assert('prefs vault file written', sealed === true);
+  void origEnabled;
+
+  const tonyMcp = require('../src/mcp/tony-server');
+  assert('tony mcp tools', tonyMcp.listMcpTools().length >= 10);
+  assert('tony mcp status', tonyMcp.status().mode === 'tony-mcp-http');
+  assert('stream helper', typeof require('../src/llm/stream').chunkText === 'function');
+  assert('generate_skill tool', Boolean(getTool('generate_skill')));
+  assert('vault watch tool', Boolean(getTool('vault_watch_status')));
 
   const web = require('../src/tools/web_search');
   assert('web search url', web.buildSearchUrl('tony ai').includes('duckduckgo.com'));

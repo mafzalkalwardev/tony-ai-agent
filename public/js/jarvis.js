@@ -398,6 +398,23 @@
         }))
       )
     );
+    $('#btnVaultWatch')?.addEventListener('click', () =>
+      operatorAction('vault watch', () =>
+        api('/api/vault/watch', { method: 'POST', body: JSON.stringify({ action: 'start' }) }).then((r) => ({
+          markdown: `# Vault watcher\n\`\`\`json\n${JSON.stringify(r, null, 2)}\n\`\`\``,
+        }))
+      )
+    );
+    $('#btnGenSkill')?.addEventListener('click', () =>
+      operatorAction('draft skill', () =>
+        api('/api/skills/generate', {
+          method: 'POST',
+          body: JSON.stringify({ name: 'operator-flow', query: 'operator' }),
+        }).then((r) => ({
+          markdown: `# Skill draft: ${r.id}\n\n\`\`\`md\n${String(r.content || '').slice(0, 4000)}\n\`\`\``,
+        }))
+      )
+    );
     $('#btnExportDelivery')?.addEventListener('click', () =>
       operatorAction('export delivery', () =>
         api('/api/delivery/export', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({

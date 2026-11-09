@@ -61,18 +61,26 @@
 - [x] Local reminders + daily briefing
 - [x] Always-listen silence calibration from server settings
 
+## v2.13 (shipped)
+
+- [x] Obsidian live vault watcher + sync index
+- [x] Streaming chat (SSE `/api/chat/stream` + WS deltas)
+- [x] Optional encrypted preference vault (`TONY_PREFS_SECRET`)
+- [x] Skill draft generator from successful playbooks
+- [x] TONY MCP tool server (`/api/mcp/tony/*`) for Cursor
+
 ## v2.1 (next)
 
 - [x] Telegram / Discord channels
 - [ ] Vector embeddings for semantic search (sqlite-vec)
-- [ ] Streaming Groq + ElevenLabs responses
-- [ ] Obsidian sync with live vault watcher
-- [ ] MCP server mode for Cursor integration
+- [x] Streaming Groq + ElevenLabs responses (chat SSE/WS; TTS stream later)
+- [x] Obsidian sync with live vault watcher
+- [x] MCP server mode for Cursor integration
 - [x] Optional faster-whisper local STT when Deepgram offline
 
 ## v3.0 (vision)
 
 - [ ] Persistent agent graph (LangGraph-style checkpoints)
-- [ ] Self-improving skill generation from successful traces
+- [x] Self-improving skill generation from successful traces (drafts)
 - [ ] Multi-user tenancy with encrypted memory partitions
 - [ ] Charlie OS desktop tray / system service

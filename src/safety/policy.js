@@ -95,6 +95,9 @@ const INTENT_SAFE = new Set([
   'reminder',
   'workspace_switch',
   'workspace_list',
+  'vault_watch',
+  'generate_skill',
+  'prefs_vault',
 ]);
 
 const INTENT_BLOCKED = new Set(['read_secrets']);

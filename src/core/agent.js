@@ -117,6 +117,10 @@ Use create_issue / create_pr (gh) after approval or trusted mode.
 Telegram + Discord channels can receive/send remote commands when configured.
 Use workspace_list / workspace_add / workspace_switch for multi-repo work.
 Use reminder_add / daily_briefing for local reminders and morning briefings.
+Use vault_watch_start / vault_sync_index for live Obsidian vault watching.
+Use generate_skill to draft skills from successful playbooks.
+Use prefs_vault_seal / prefs_vault_open when TONY_PREFS_SECRET is set.
+TONY MCP tools are available at /api/mcp/tony/* for Cursor integration.
 For big risky choices use decide_action — in trusted mode take the decision and execute; otherwise ask once.
 When a tool fails, analyze the error, apply a fix, and retry — do not repeat the same failing call unchanged.
 Use error_learn to save fixes that worked. Use self_heal on persistent failures.
@@ -777,6 +781,55 @@ async function handleLocalOperatorIntent({ routed, safety, sessionId, message })
         ? `Switched workspace to **${result.switchedTo.name}**\n\`${result.workspaceRoot}\``
         : result.error,
       'workspace_switch',
+      result
+    );
+  }
+  if (routed.intent === 'vault_watch') {
+    const watcher = require('../brain/vault_watcher');
+    if (/\bsync\b/i.test(message)) {
+      const result = watcher.syncIndex();
+      return reply(
+        result.ok
+          ? `Vault index synced. Events: ${result.events?.length || 0}`
+          : result.error,
+        'vault_sync_index',
+        result
+      );
+    }
+    const started = watcher.start();
+    const st = watcher.status();
+    return reply(
+      `# Vault watcher\nWatching: **${st.watching ? 'yes' : 'no'}**\nRecent events: ${st.recentEvents?.length || 0}\n${
+        started.error ? `\nNote: ${started.error}` : ''
+      }`,
+      'vault_watch_status',
+      { ...started, ...st }
+    );
+  }
+  if (routed.intent === 'generate_skill') {
+    const name =
+      String(message || '')
+        .replace(/.*\b(generate|draft)\s+skill\b[:\s-]*/i, '')
+        .replace(/.*\bskill\s+(banao|draft|generate)\b[:\s-]*/i, '')
+        .trim() || 'operator-flow';
+    const write = /\bwrite\b|\bsave\b/i.test(message);
+    const result = require('../skills/generate').draftFromPlaybooks({ name, query: name, write });
+    return reply(
+      `${result.draftOnly ? 'Draft only' : 'Saved'} skill **${result.id}** (from ${result.playbooksUsed} playbooks)\n\n\`\`\`md\n${String(result.content).slice(0, 3500)}\n\`\`\``,
+      'generate_skill',
+      result
+    );
+  }
+  if (routed.intent === 'prefs_vault') {
+    const vault = require('../tools/pref_vault');
+    if (/\brestore|open\b/i.test(message)) {
+      const result = vault.restoreIntoLivePrefs();
+      return reply(result.ok ? 'Encrypted prefs restored into live preferences.' : result.error, 'prefs_vault_open', result);
+    }
+    const result = vault.sealFromLivePrefs();
+    return reply(
+      result.ok ? `Preferences sealed into encrypted vault at ${result.at}` : result.error,
+      'prefs_vault_seal',
       result
     );
   }
