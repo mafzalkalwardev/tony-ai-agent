@@ -91,6 +91,10 @@ const INTENT_SAFE = new Set([
   'settings',
   'file_task',
   'list_memorial_voices',
+  'daily_briefing',
+  'reminder',
+  'workspace_switch',
+  'workspace_list',
 ]);
 
 const INTENT_BLOCKED = new Set(['read_secrets']);

@@ -1,6 +1,10 @@
 /**
  * Client delivery helper — prepares content only. Never sends messages.
+ * Auto-attaches the latest test report when available under data/reports.
  */
+const fs = require('fs');
+const path = require('path');
+const config = require('../config');
 const projectScanner = require('./project_scanner');
 
 function prepareDeliveryPackage({ projectPath = '.', completedWork = '', limitations = '' } = {}) {
@@ -15,6 +19,8 @@ function prepareDeliveryPackage({ projectPath = '.', completedWork = '', limitat
       'TONY does not auto-send this message.',
       'Secrets must stay in .env and are never included here.',
     ].join('\n- ');
+
+  const testReport = loadLatestTestReport();
 
   const clientMessage = `Hi,
 
@@ -36,6 +42,15 @@ Testing checklist:
 - [ ] Main flows verified manually
 - [ ] No secrets committed
 
+${
+  testReport
+    ? `Latest automated test report (${testReport.file}):
+\`\`\`
+${testReport.excerpt}
+\`\`\`
+`
+    : 'Latest automated test report: not found yet (run tests first).\n'
+}
 Known limitations:
 - ${knownLimitations}
 
@@ -55,6 +70,10 @@ Muhammad Afzal`;
       buildCommand: scan.buildCommand,
     },
     completedWork: work,
+    testReportAttached: Boolean(testReport),
+    testReport: testReport
+      ? { file: testReport.file, excerpt: testReport.excerpt, at: testReport.at }
+      : null,
     setupInstructions: [
       'Clone or open the project folder',
       'Install dependencies',
@@ -65,20 +84,71 @@ Muhammad Afzal`;
     testingChecklist: [
       `Tests folder present: ${scan.hasTestsFolder ? 'yes' : 'review manually'}`,
       `Recommended test command: ${scan.testCommand || 'not detected'}`,
-      'Attach test output / screenshots as proof',
+      testReport ? `Attached latest test report: ${testReport.file}` : 'Attach test output / screenshots as proof',
       'Verify primary user flows manually',
     ],
     knownLimitations: knownLimitations.split('\n- ').filter(Boolean),
     clientMessage,
-    markdown: toMarkdown({ scan, work, knownLimitations, clientMessage }),
+    markdown: toMarkdown({ scan, work, knownLimitations, clientMessage, testReport }),
   };
+}
+
+function reportsDir() {
+  return path.join(config.dataDir, 'reports');
+}
+
+function saveTestReport({ command, ok, output = '', error = '' } = {}) {
+  fs.mkdirSync(reportsDir(), { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const file = path.join(reportsDir(), `test_${stamp}.txt`);
+  const body = [
+    `# TONY test report`,
+    `at: ${new Date().toISOString()}`,
+    `ok: ${Boolean(ok)}`,
+    `command: ${command || ''}`,
+    '',
+    String(output || error || '').slice(0, 20000),
+  ].join('\n');
+  fs.writeFileSync(file, body, 'utf8');
+  fs.writeFileSync(path.join(reportsDir(), 'last_test.txt'), body, 'utf8');
+  return { ok: true, file: path.relative(config.workspaceRoot, file) };
+}
+
+function loadLatestTestReport() {
+  try {
+    const dir = reportsDir();
+    const last = path.join(dir, 'last_test.txt');
+    if (fs.existsSync(last)) {
+      const text = fs.readFileSync(last, 'utf8');
+      return {
+        file: 'last_test.txt',
+        excerpt: text.slice(0, 2500),
+        at: fs.statSync(last).mtime.toISOString(),
+      };
+    }
+    if (!fs.existsSync(dir)) return null;
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => /^test_.*\.txt$/i.test(f))
+      .map((f) => ({ f, m: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.m - a.m);
+    if (!files.length) return null;
+    const text = fs.readFileSync(path.join(dir, files[0].f), 'utf8');
+    return {
+      file: files[0].f,
+      excerpt: text.slice(0, 2500),
+      at: new Date(files[0].m).toISOString(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function pathBasename(p) {
   return String(p || '').split(/[\\/]/).filter(Boolean).pop() || 'project';
 }
 
-function toMarkdown({ scan, work, knownLimitations, clientMessage }) {
+function toMarkdown({ scan, work, knownLimitations, clientMessage, testReport }) {
   return `# Client Delivery Package
 
 ## Project summary
@@ -102,7 +172,16 @@ function toMarkdown({ scan, work, knownLimitations, clientMessage }) {
 - [ ] Tests pass
 - [ ] Manual flows verified
 - [ ] No secrets in repo
-
+${
+  testReport
+    ? `
+## Attached latest test report (\`${testReport.file}\`)
+\`\`\`
+${testReport.excerpt}
+\`\`\`
+`
+    : '\n## Attached latest test report\n- None yet — run tests first.\n'
+}
 ## Known limitations
 - ${knownLimitations}
 
@@ -115,4 +194,4 @@ Draft only. Review and send manually.
 `;
 }
 
-module.exports = { prepareDeliveryPackage };
+module.exports = { prepareDeliveryPackage, saveTestReport, loadLatestTestReport };

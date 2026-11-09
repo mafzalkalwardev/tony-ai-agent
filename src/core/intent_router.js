@@ -105,6 +105,38 @@ const RULES = [
     ],
   },
   {
+    category: 'settings',
+    intent: 'daily_briefing',
+    patterns: [
+      /\bdaily\s+briefing\b/i,
+      /\bmorning\s+brief(ing)?\b/i,
+      /\bbrief\s+me\b/i,
+      /\baj\s+ka\s+brief\b/i,
+      /\bsubah\s+ka\s+update\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'reminder',
+    patterns: [
+      /\bremind(er|ers)?\b/i,
+      /\byaad\s+dilana\b/i,
+      /\breminder\s+(set|add|banao)\b/i,
+      /\bin\s+\d+\s+(minute|minutes|min|hour|hours)\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'workspace_switch',
+    patterns: [
+      /\bswitch\s+workspace\b/i,
+      /\bworkspace\s+(switch|change|list|add)\b/i,
+      /\bchange\s+(repo|workspace)\b/i,
+      /\bmulti[- ]?repo\b/i,
+      /\bactive\s+workspace\b/i,
+    ],
+  },
+  {
     category: 'run_tests',
     intent: 'run_tests',
     patterns: [

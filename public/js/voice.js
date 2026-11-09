@@ -66,6 +66,8 @@
       Voice.alwaysListen = h.companion?.alwaysListen !== false;
       Voice.minConfidence = h.voice?.minConfidence ?? 0.55;
       Voice.noiseCancel = h.voice?.noiseCancellation !== false;
+      Voice.silenceStopSeconds = h.voice?.silenceStopSeconds ?? 1.2;
+      Voice.silenceThreshold = h.voice?.silenceThreshold ?? 0.015;
       Voice.useBrowserStt = !Voice.deepgramOk && 'webkitSpeechRecognition' in window;
       Voice.useBrowserTts = !Voice.ttsOk && 'speechSynthesis' in window;
 
@@ -189,11 +191,13 @@
 
     try {
       const voiceCfg = window.tonyStatus?.voice || {};
+      const silenceStop = Voice.silenceStopSeconds ?? voiceCfg.silenceStopSeconds ?? 1.2;
+      const silenceThresh = Voice.silenceThreshold ?? voiceCfg.silenceThreshold ?? 0.015;
       Voice.voiceGate = new Gate({
         speechMult: voiceCfg.vadSpeechMult ?? 3.2,
         highPassHz: voiceCfg.highPassHz ?? 180,
-        minRms: voiceCfg.silenceThreshold ?? 0.014,
-        silenceMs: Math.round((voiceCfg.silenceStopSeconds ?? 1.2) * 1000),
+        minRms: silenceThresh,
+        silenceMs: Math.round(silenceStop * 1000),
       });
 
       await Voice.voiceGate.start(async (blob, mime) => {

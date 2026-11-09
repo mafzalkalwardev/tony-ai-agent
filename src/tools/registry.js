@@ -503,6 +503,10 @@ const builtins = {
       const { canRunCommand } = require('../safety/policy');
       const { logCommand } = require('./runners');
       const approvals = require('../safety/approvals');
+      const rate = require('../safety/rate_limit').check('shell');
+      if (!rate.allowed) {
+        return { ok: false, level: 'RATE_LIMITED', error: rate.error, retryAfterMs: rate.retryAfterMs };
+      }
       const check = canRunCommand(command, { approved, unsafeMode: config.shellUnsafe });
       if (!check.allowed) {
         let pending = null;
@@ -528,7 +532,7 @@ const builtins = {
         timeout: 120000,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-      return { ok: true, level: check.level, output: out.slice(0, 8000) };
+      return { ok: true, level: check.level, output: out.slice(0, 8000), rateRemaining: rate.remaining };
     },
   },
 
@@ -1612,6 +1616,8 @@ builtins.telegram_send = {
   },
   async execute({ text, approved = false } = {}) {
     const trusted = require('../safety/trusted_mode');
+    const rate = require('../safety/rate_limit').check('telegram_send');
+    if (!rate.allowed) return { ok: false, error: rate.error, retryAfterMs: rate.retryAfterMs };
     if (!approved && !trusted.canAutoApprove('send_message', text)) {
       const pending = require('../safety/approvals').create({
         action: 'telegram_send',
@@ -1621,6 +1627,128 @@ builtins.telegram_send = {
       return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
     }
     return require('../channels/telegram').sendMessage(text);
+  },
+};
+
+builtins.discord_status = {
+  name: 'discord_status',
+  description: 'Show Discord remote channel status',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../channels/discord').status() };
+  },
+};
+
+builtins.discord_send = {
+  name: 'discord_send',
+  description: 'Send a message via Discord webhook (approval/trusted for outbound)',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      approved: { type: 'boolean' },
+    },
+    required: ['text'],
+  },
+  async execute({ text, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    const rate = require('../safety/rate_limit').check('discord_send');
+    if (!rate.allowed) return { ok: false, error: rate.error, retryAfterMs: rate.retryAfterMs };
+    if (!approved && !trusted.canAutoApprove('send_message', text)) {
+      const pending = require('../safety/approvals').create({
+        action: 'discord_send',
+        command: text.slice(0, 120),
+        reason: 'Outbound Discord message requires approval',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('../channels/discord').sendMessage(text);
+  },
+};
+
+builtins.workspace_list = {
+  name: 'workspace_list',
+  description: 'List registered multi-repo workspaces and the active root',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./workspaces').list();
+  },
+};
+
+builtins.workspace_add = {
+  name: 'workspace_add',
+  description: 'Register another local repo path as a TONY workspace',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      path: { type: 'string' },
+    },
+    required: ['name', 'path'],
+  },
+  async execute({ name, path: repoPath }) {
+    return require('./workspaces').addWorkspace({ name, path: repoPath });
+  },
+};
+
+builtins.workspace_switch = {
+  name: 'workspace_switch',
+  description: 'Switch TONY active workspace root by id or name',
+  parameters: {
+    type: 'object',
+    properties: { id: { type: 'string' } },
+    required: ['id'],
+  },
+  async execute({ id }) {
+    return require('./workspaces').switchWorkspace(id);
+  },
+};
+
+builtins.reminder_add = {
+  name: 'reminder_add',
+  description: 'Create a local reminder (minutesFromNow or dueAt ISO)',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      minutesFromNow: { type: 'number' },
+      dueAt: { type: 'string' },
+    },
+    required: ['text'],
+  },
+  async execute(args = {}) {
+    return require('./reminders').addReminder(args);
+  },
+};
+
+builtins.reminder_list = {
+  name: 'reminder_list',
+  description: 'List open local reminders',
+  parameters: { type: 'object', properties: { includeDone: { type: 'boolean' } } },
+  async execute({ includeDone = false } = {}) {
+    return { ok: true, reminders: require('./reminders').list({ includeDone }) };
+  },
+};
+
+builtins.reminder_complete = {
+  name: 'reminder_complete',
+  description: 'Mark a reminder done by id',
+  parameters: {
+    type: 'object',
+    properties: { id: { type: 'string' } },
+    required: ['id'],
+  },
+  async execute({ id }) {
+    return require('./reminders').completeReminder(id);
+  },
+};
+
+builtins.daily_briefing = {
+  name: 'daily_briefing',
+  description: 'Generate morning/afternoon operator briefing (repo + reminders + trusted mode)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./reminders').dailyBriefing();
   },
 };
 

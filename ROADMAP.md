@@ -52,14 +52,23 @@
 - [x] Expanded desktop automation sequences
 - [x] research_web / browse_site for any public http(s) URL
 
+## v2.12 (shipped)
+
+- [x] Discord remote channel (webhook outbound + incoming API)
+- [x] Multi-repo workspace picker
+- [x] Delivery auto-attaches latest test report
+- [x] Per-tool shell/outbound rate limits
+- [x] Local reminders + daily briefing
+- [x] Always-listen silence calibration from server settings
+
 ## v2.1 (next)
 
-- [ ] Telegram / Discord channels
+- [x] Telegram / Discord channels
 - [ ] Vector embeddings for semantic search (sqlite-vec)
 - [ ] Streaming Groq + ElevenLabs responses
 - [ ] Obsidian sync with live vault watcher
 - [ ] MCP server mode for Cursor integration
-- [ ] Optional faster-whisper local STT when Deepgram offline
+- [x] Optional faster-whisper local STT when Deepgram offline
 
 ## v3.0 (vision)
 

@@ -386,6 +386,18 @@
         })
       )
     );
+    $('#btnBriefing')?.addEventListener('click', () =>
+      operatorAction('daily briefing', () => api('/api/briefing'))
+    );
+    $('#btnWorkspaces')?.addEventListener('click', () =>
+      operatorAction('workspaces', () =>
+        api('/api/workspaces').then((r) => ({
+          markdown: `# Workspaces\nActive: \`${r.activePath}\`\n\n${(r.workspaces || [])
+            .map((w) => `- ${w.active ? '✅ ' : ''}${w.name} (\`${w.id}\`) → ${w.path}`)
+            .join('\n')}`,
+        }))
+      )
+    );
     $('#btnExportDelivery')?.addEventListener('click', () =>
       operatorAction('export delivery', () =>
         api('/api/delivery/export', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({

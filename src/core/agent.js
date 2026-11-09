@@ -114,7 +114,9 @@ Memorial voice cloning of loved ones is allowed ONLY through memorial_voice_* to
 Use browser_operator / research_web / browse_site / playwright tools for full-web research and site control.
 Use desktop_automate / laptop_control / open_app for full laptop control (click/type/scroll/drag/hotkeys/sequences).
 Use create_issue / create_pr (gh) after approval or trusted mode.
-Telegram channel can receive remote commands when configured.
+Telegram + Discord channels can receive/send remote commands when configured.
+Use workspace_list / workspace_add / workspace_switch for multi-repo work.
+Use reminder_add / daily_briefing for local reminders and morning briefings.
 For big risky choices use decide_action — in trusted mode take the decision and execute; otherwise ask once.
 When a tool fails, analyze the error, apply a fix, and retry — do not repeat the same failing call unchanged.
 Use error_learn to save fixes that worked. Use self_heal on persistent failures.
@@ -698,6 +700,85 @@ async function handleLocalOperatorIntent({ routed, safety, sessionId, message })
       return reply(`# ${params.filePath}\n\n\`\`\`\n${String(result.content).slice(0, 4000)}\n\`\`\``, 'read_file', result);
     }
     return reply(result.error || 'Could not read file.', 'read_file', result);
+  }
+  if (routed.intent === 'daily_briefing') {
+    const brief = require('../tools/reminders').dailyBriefing();
+    return reply(brief.markdown, 'daily_briefing', brief);
+  }
+  if (routed.intent === 'reminder') {
+    const minutesMatch = String(message || '').match(/\bin\s+(\d+)\s+(minute|minutes|min|hour|hours)\b/i);
+    let minutesFromNow = 60;
+    if (minutesMatch) {
+      const n = Number(minutesMatch[1]);
+      minutesFromNow = /hour/i.test(minutesMatch[2]) ? n * 60 : n;
+    }
+    const text = String(message || '')
+      .replace(/^.*?\b(reminder|remind me|yaad dilana)\b[:\s-]*/i, '')
+      .replace(/\bin\s+\d+\s+(minute|minutes|min|hour|hours)\b/i, '')
+      .trim() || String(message || '').trim();
+    if (/^list|dikhao|show/i.test(text) || /\breminders?\b\s*$/i.test(message || '')) {
+      const items = require('../tools/reminders').list();
+      return reply(
+        items.length
+          ? `# Reminders\n${items.map((r) => `- ${r.text} _(due ${r.dueAt})_`).join('\n')}`
+          : 'No open reminders. Say `Tony reminder in 30 minutes: …`',
+        'reminder_list',
+        { reminders: items }
+      );
+    }
+    const result = require('../tools/reminders').addReminder({ text, minutesFromNow });
+    return reply(
+      result.ok
+        ? `Reminder set for **${result.reminder.dueAt}**:\n${result.reminder.text}`
+        : result.error,
+      'reminder_add',
+      result
+    );
+  }
+  if (routed.intent === 'workspace_switch') {
+    const ws = require('../tools/workspaces');
+    if (/\blist\b/i.test(message)) {
+      const listed = ws.list();
+      return reply(
+        `# Workspaces\nActive: \`${listed.activePath}\`\n${listed.workspaces
+          .map((w) => `- ${w.active ? '✅ ' : ''}${w.name} (\`${w.id}\`) → ${w.path}`)
+          .join('\n')}`,
+        'workspace_list',
+        listed
+      );
+    }
+    const addMatch = String(message || '').match(/\badd\s+workspace\s+(.+?)\s+at\s+(.+)$/i);
+    if (addMatch) {
+      const result = ws.addWorkspace({ name: addMatch[1].trim(), path: addMatch[2].trim() });
+      return reply(
+        result.ok ? `Workspace added. Active still: \`${result.activePath}\`` : result.error,
+        'workspace_add',
+        result
+      );
+    }
+    const target =
+      String(message || '')
+        .replace(/.*\b(switch|change)\s+(workspace|repo)\b[:\s-]*/i, '')
+        .replace(/.*\bworkspace\s+switch\b[:\s-]*/i, '')
+        .trim() || '';
+    if (!target || /^(list|show)$/i.test(target)) {
+      const listed = ws.list();
+      return reply(
+        `# Workspaces\nActive: \`${listed.activePath}\`\n${listed.workspaces
+          .map((w) => `- ${w.active ? '✅ ' : ''}${w.name} (\`${w.id}\`) → ${w.path}`)
+          .join('\n')}\n\nSwitch with: \`Tony switch workspace <name>\``,
+        'workspace_list',
+        listed
+      );
+    }
+    const result = ws.switchWorkspace(target);
+    return reply(
+      result.ok
+        ? `Switched workspace to **${result.switchedTo.name}**\n\`${result.workspaceRoot}\``
+        : result.error,
+      'workspace_switch',
+      result
+    );
   }
   if (routed.intent === 'memorial_voice') {
     const memorial = require('../voice/memorial_voice');

@@ -47,15 +47,28 @@ function runDetected(command, { approved = false } = {}) {
       timeout: 180000,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    return { ok: true, level: check.level, command, output: String(output).slice(0, 12000) };
+    const result = { ok: true, level: check.level, command, output: String(output).slice(0, 12000) };
+    maybeSaveTestReport(result);
+    return result;
   } catch (e) {
-    return {
+    const result = {
       ok: false,
       level: check.level,
       command,
       error: e.message,
       output: String(e.stdout || e.stderr || '').slice(0, 8000),
     };
+    maybeSaveTestReport(result);
+    return result;
+  }
+}
+
+function maybeSaveTestReport(result) {
+  if (!/\b(test|pytest|jest|mocha|vitest)\b/i.test(result.command || '')) return;
+  try {
+    require('./delivery_helper').saveTestReport(result);
+  } catch {
+    /* ignore */
   }
 }
 

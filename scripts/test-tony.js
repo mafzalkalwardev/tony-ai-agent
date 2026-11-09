@@ -141,6 +141,9 @@ async function main() {
   assert('intent create issue', intentRouter.route('create issue login bug').intent === 'create_issue');
   assert('intent create pr', intentRouter.route('create pr').intent === 'create_pr');
   assert('intent memorial voice', intentRouter.route('memorial voice for ammi').intent === 'memorial_voice');
+  assert('intent daily briefing', intentRouter.route('Tony daily briefing').intent === 'daily_briefing');
+  assert('intent reminder', intentRouter.route('Tony reminder in 30 minutes call client').intent === 'reminder');
+  assert('intent workspace', intentRouter.route('Tony switch workspace').intent === 'workspace_switch');
   assert('intent open vscode', intentRouter.route('VS Code kholo').intent === 'open_app');
 
   const params = require('../src/core/params');
@@ -188,6 +191,34 @@ async function main() {
 
   const browserOp = require('../src/tools/browser_operator');
   assert('browser operator status', browserOp.status().operator === true);
+
+  const discord = require('../src/channels/discord');
+  assert('discord status', typeof discord.status === 'function' && discord.status().configured === false);
+
+  const workspaces = require('../src/tools/workspaces');
+  assert('workspace list', workspaces.list().ok === true && workspaces.list().workspaces.length >= 1);
+
+  const reminders = require('../src/tools/reminders');
+  const rem = reminders.addReminder({ text: 'test-reminder-tony', minutesFromNow: 5 });
+  assert('reminder add', rem.ok === true);
+  assert('reminder list', reminders.list().some((r) => r.text === 'test-reminder-tony'));
+  assert('reminder complete', reminders.completeReminder(rem.reminder.id).ok === true);
+  assert('daily briefing', reminders.dailyBriefing().ok === true && reminders.dailyBriefing().markdown.includes('Reminders'));
+
+  const rateLimit = require('../src/safety/rate_limit');
+  assert('rate limit allows first', rateLimit.check('shell').allowed === true);
+  assert('rate limit status', rateLimit.status().shell.max >= 1);
+
+  require('../src/tools/delivery_helper').saveTestReport({
+    command: 'npm test',
+    ok: true,
+    output: 'all good tony-test-report',
+  });
+  const packWithReport = require('../src/tools/delivery_helper').prepareDeliveryPackage({ projectPath: '.' });
+  assert('delivery attaches test report', packWithReport.testReportAttached === true);
+  assert('discord tool', Boolean(getTool('discord_send')));
+  assert('workspace tool', Boolean(getTool('workspace_switch')));
+  assert('briefing tool', Boolean(getTool('daily_briefing')));
 
   const web = require('../src/tools/web_search');
   assert('web search url', web.buildSearchUrl('tony ai').includes('duckduckgo.com'));

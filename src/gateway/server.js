@@ -42,15 +42,19 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.11.0',
+    version: '2.12.0',
     llm: config.llmProvider,
     operator: {
       categories: require('../core/intent_router').CATEGORIES,
       pendingApprovals: require('../safety/approvals').list('pending').length,
       trustedMode: require('../safety/trusted_mode').status(),
       telegram: require('../channels/telegram').status(),
+      discord: require('../channels/discord').status(),
       memorialVoice: require('../voice/memorial_voice').status(),
       browserOperator: require('../tools/browser_operator').status(),
+      workspace: require('../tools/workspaces').list(),
+      rateLimits: require('../safety/rate_limit').status(),
+      remindersDue: require('../tools/reminders').dueNow().length,
     },
     llmChain: require('../llm').providerStatus(),
     online,
@@ -516,6 +520,69 @@ app.post('/api/telegram/send', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+app.get('/api/discord/status', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../channels/discord').status() });
+});
+
+app.post('/api/discord/send', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'discord_send',
+      { text: req.body?.text || '', approved: Boolean(req.body?.approved) },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/discord/incoming', auth, async (req, res) => {
+  try {
+    res.json(await require('../channels/discord').handleIncoming(req.body || {}));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspaces', auth, (_req, res) => {
+  res.json(require('../tools/workspaces').list());
+});
+
+app.post('/api/workspaces', auth, (req, res) => {
+  const { action = 'list', name, path: repoPath, id } = req.body || {};
+  const ws = require('../tools/workspaces');
+  if (action === 'add') return res.json(ws.addWorkspace({ name, path: repoPath }));
+  if (action === 'switch') return res.json(ws.switchWorkspace(id || name));
+  if (action === 'remove') return res.json(ws.removeWorkspace(id || name));
+  return res.json(ws.list());
+});
+
+app.get('/api/reminders', auth, (req, res) => {
+  res.json({
+    ok: true,
+    reminders: require('../tools/reminders').list({ includeDone: req.query.includeDone === '1' }),
+    due: require('../tools/reminders').dueNow(),
+  });
+});
+
+app.post('/api/reminders', auth, (req, res) => {
+  const reminders = require('../tools/reminders');
+  if (req.body?.completeId) return res.json(reminders.completeReminder(req.body.completeId));
+  if (req.body?.briefing) return res.json(reminders.dailyBriefing());
+  res.json(
+    reminders.addReminder({
+      text: req.body?.text,
+      minutesFromNow: req.body?.minutesFromNow,
+      dueAt: req.body?.dueAt,
+    })
+  );
+});
+
+app.get('/api/briefing', auth, (_req, res) => {
+  res.json(require('../tools/reminders').dailyBriefing());
 });
 
 app.get('/api/memorial-voice', auth, (_req, res) => {

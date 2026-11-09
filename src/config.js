@@ -157,8 +157,17 @@ module.exports = {
     chatId: env('TELEGRAM_CHAT_ID', ''),
     polling: env('TELEGRAM_POLLING', 'false') === 'true',
   },
+  discord: {
+    webhookUrl: env('DISCORD_WEBHOOK_URL', ''),
+    botToken: env('DISCORD_BOT_TOKEN', ''),
+    allowedUser: env('DISCORD_ALLOWED_USER', ''),
+  },
   memorialVoice: {
     enabled: env('TONY_MEMORIAL_VOICE', 'true') === 'true',
+  },
+  rateLimits: {
+    shellMax: Number(env('TONY_SHELL_RATE_MAX', '30')),
+    shellWindowMs: Number(env('TONY_SHELL_RATE_WINDOW_MS', '60000')),
   },
   tonyDesktop: {
     path: env('TONY_DESKTOP_PATH', ''),

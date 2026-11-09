@@ -1,6 +1,6 @@
 # TONY — Operator Roadmap
 
-Last updated: 2026-11-09 (v2.10)
+Last updated: 2026-11-09 (v2.12)
 
 Incremental improvements only. Do not rebuild from scratch.
 
@@ -25,35 +25,32 @@ Incremental improvements only. Do not rebuild from scratch.
 - [x] Decision engine for big/risky choices
 - [x] Expanded desktop control (scroll/drag/doubleclick/sequence)
 - [x] Full-web research + browse any public http(s) site
+- [x] Memorial voice consent flow
+- [x] Telegram + Discord channels
+- [x] Multi-repo workspace picker
+- [x] Auto-attach latest test report into delivery export
+- [x] Richer GitHub PR/issue create via `gh` after trusted/approval
+- [x] Per-tool rate limits for shell / outbound messaging
+- [x] Local reminders + daily briefing
+- [x] Calibrate browser always-listen with silenceStopSeconds from settings
 
 ## Next
 
-### Voice
-- [ ] Calibrate browser always-listen with silenceStopSeconds from settings
-- [x] Explicit memorial voice-clone consent flow (API + tools + intent)
-
-### Operator
-- [ ] Multi-repo workspace picker
-- [ ] Auto-attach latest test report into delivery export
-- [ ] Richer GitHub PR create via `gh` after trusted/approval
-
 ### Hardening
 - [ ] Encrypted preference vault option
-- [ ] Per-tool rate limits for shell
+- [ ] Streaming chat/TTS responses
+- [ ] Vector embeddings for semantic search
 
 ## New demos
 
 ```text
+Tony daily briefing
+Tony reminder in 30 minutes: call client
+Tony switch workspace
+Tony memorial voice
 Tony trusted mode on
 Tony research groq rate limits
-Tony laptop control
-Tony repo summarize karo
-Tony explain changed files
-Tony commit message banao
-Tony prepare pr
-Tony VS Code kholo
-Tony browser mein search karo groq models
-Tony project note: client wants dark mode
+Tony create issue login bug
 Tony export delivery
 Tony trusted mode off
 ```
