@@ -147,6 +147,10 @@ async function main() {
   assert('intent vault watch', intentRouter.route('Tony vault watch').intent === 'vault_watch');
   assert('intent generate skill', intentRouter.route('Tony generate skill deploy').intent === 'generate_skill');
   assert('intent prefs vault', intentRouter.route('Tony seal preferences').intent === 'prefs_vault');
+  assert('intent client tracker', intentRouter.route('Tony add client Acme').intent === 'client_tracker');
+  assert('intent macro', intentRouter.route('Tony save macro status: repo check').intent === 'macro');
+  assert('intent export session', intentRouter.route('Tony export session').intent === 'export_session');
+  assert('intent memory reindex', intentRouter.route('Tony reindex memory').intent === 'memory_reindex');
   assert('intent open vscode', intentRouter.route('VS Code kholo').intent === 'open_app');
 
   const params = require('../src/core/params');
@@ -280,6 +284,35 @@ async function main() {
   assert('stream helper', typeof require('../src/llm/stream').chunkText === 'function');
   assert('generate_skill tool', Boolean(getTool('generate_skill')));
   assert('vault watch tool', Boolean(getTool('vault_watch_status')));
+
+  const embeddings = require('../src/memory/embeddings');
+  embeddings.indexText('t1', 'Tony loves Marvel and automation workflows');
+  embeddings.indexText('t2', 'Client delivery checklist for web apps');
+  const embHits = embeddings.search('marvel automation', 3);
+  assert('embeddings search', embHits.length >= 1 && embHits[0].score > 0);
+  memory.remember('User likes Roman Urdu operator commands', ['test', 'lang']);
+  assert('semantic vector aware', require('../src/memory/semantic').search('Roman Urdu').length >= 1);
+
+  const clients = require('../src/tools/clients');
+  assert('client upsert', clients.upsertClient({ name: 'Acme', notes: 'wants dark mode' }).ok === true);
+  assert('client list', clients.list().clients.some((c) => c.name === 'Acme'));
+  assert('client rejects secrets', clients.upsertClient({ name: 'Bad', notes: 'api_key=secret' }).ok === false);
+
+  const macros = require('../src/tools/macros');
+  assert('macro save', macros.saveMacro({ name: 'status', command: 'repo check karo' }).ok === true);
+  assert('macro get', macros.getMacro('status').ok === true);
+
+  const sessionExport = require('../src/tools/session_export');
+  const sid = randomUUID();
+  memory.appendEpisode(sid, 'user', 'hello export');
+  memory.appendEpisode(sid, 'assistant', 'hi there');
+  assert('session export', sessionExport.exportSession(sid).ok === true);
+
+  const ttsStream = require('../src/voice/tts_stream');
+  assert('tts split sentences', ttsStream.splitSentences('Hi. There!').length >= 2);
+  assert('client tool', Boolean(getTool('client_upsert')));
+  assert('macro tool', Boolean(getTool('macro_save')));
+  assert('vector search tool', Boolean(getTool('memory_vector_search')));
 
   const web = require('../src/tools/web_search');
   assert('web search url', web.buildSearchUrl('tony ai').includes('duckduckgo.com'));

@@ -22,14 +22,25 @@ const CATEGORIES = [
 
 const RULES = [
   {
+    category: 'settings',
+    intent: 'macro',
+    patterns: [
+      /\bsave\s+macro\b/i,
+      /\brun\s+macro\b/i,
+      /\bmacro\s+list\b/i,
+      /\blist\s+macros\b/i,
+      /\boperator\s+shortcut\b/i,
+    ],
+  },
+  {
     category: 'github_task',
     intent: 'git_status',
     patterns: [
-      /\brepo\s+(check|status)\b/i,
+      /^(tony[,:]?\s+)?repo\s+(check|status)\b/i,
       /\bgit\s+status\b/i,
       /\bstatus\s+(dikhao|batao|show)\b/i,
       /\bmujhe\s+status\s+batao\b/i,
-      /\brepo\s+check\s+karo\b/i,
+      /^(tony[,:]?\s+)?repo\s+check\s+karo\b/i,
     ],
   },
   {
@@ -165,6 +176,35 @@ const RULES = [
       /\bprefs?\s+vault\b/i,
       /\bseal\s+preferences\b/i,
       /\brestore\s+prefs\s+vault\b/i,
+    ],
+  },
+  {
+    category: 'client_delivery',
+    intent: 'client_tracker',
+    patterns: [
+      /\bclient\s+(list|add|note|tracker)\b/i,
+      /\badd\s+client\b/i,
+      /\blist\s+clients\b/i,
+      /\bcontact\s+(list|add)\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'export_session',
+    patterns: [
+      /\bexport\s+session\b/i,
+      /\bsession\s+export\b/i,
+      /\bexport\s+transcript\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'memory_reindex',
+    patterns: [
+      /\breindex\s+memory\b/i,
+      /\bmemory\s+reindex\b/i,
+      /\bvector\s+search\b/i,
+      /\brebuild\s+embeddings\b/i,
     ],
   },
   {

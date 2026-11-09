@@ -415,6 +415,24 @@
         }))
       )
     );
+    $('#btnClients')?.addEventListener('click', () =>
+      operatorAction('clients', () =>
+        api('/api/clients').then((r) => ({
+          markdown: `# Clients\n${(r.clients || [])
+            .map((c) => `- **${c.name}** ${c.company || ''} _(notes ${(c.notes || []).length})_`)
+            .join('\n') || '- none'}`,
+        }))
+      )
+    );
+    $('#btnMacros')?.addEventListener('click', () =>
+      operatorAction('macros', () =>
+        api('/api/macros').then((r) => ({
+          markdown: `# Macros\n${(r.macros || [])
+            .map((m) => `- **${m.name}** → \`${m.command}\``)
+            .join('\n') || '- none'}`,
+        }))
+      )
+    );
     $('#btnExportDelivery')?.addEventListener('click', () =>
       operatorAction('export delivery', () =>
         api('/api/delivery/export', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({

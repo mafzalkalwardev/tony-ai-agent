@@ -42,7 +42,7 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.13.0',
+    version: '2.14.0',
     llm: config.llmProvider,
     operator: {
       categories: require('../core/intent_router').CATEGORIES,
@@ -58,6 +58,9 @@ app.get('/health', async (_req, res) => {
       vaultWatch: require('../brain/vault_watcher').status(),
       prefsVault: require('../tools/pref_vault').status(),
       tonyMcp: require('../mcp/tony-server').status(),
+      embeddings: require('../memory/embeddings').status(),
+      clients: require('../tools/clients').list().clients.length,
+      macros: require('../tools/macros').list().macros.length,
     },
     llmChain: require('../llm').providerStatus(),
     online,
@@ -208,6 +211,40 @@ app.post('/api/voice/speak', auth, async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/voice/speak/stream', auth, async (req, res) => {
+  const { writeSse } = require('../llm/stream');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+  try {
+    const { text, voiceId } = req.body || {};
+    if (!text) {
+      writeSse(res, 'error', { error: 'text required' });
+      return res.end();
+    }
+    writeSse(res, 'status', { state: 'speaking' });
+    for await (const chunk of require('../voice/tts_stream').streamSpeak(text, { voiceId })) {
+      writeSse(res, 'audio', {
+        index: chunk.index,
+        total: chunk.total,
+        ok: chunk.ok,
+        provider: chunk.provider,
+        mimeType: chunk.mimeType,
+        audio: chunk.audio,
+        text: chunk.text,
+        chunkBytes: chunk.chunkBytes,
+        error: chunk.error,
+      });
+    }
+    writeSse(res, 'done', { ok: true });
+    res.end();
+  } catch (e) {
+    writeSse(res, 'error', { error: e.message });
+    res.end();
   }
 });
 
@@ -683,6 +720,40 @@ app.post('/api/mcp/tony/call', auth, async (req, res) => {
 
 app.get('/api/mcp/tony/status', auth, (_req, res) => {
   res.json({ ok: true, ...require('../mcp/tony-server').status() });
+});
+
+app.get('/api/memory/embeddings', auth, (req, res) => {
+  const q = req.query.q || '';
+  if (!q) return res.json({ ok: true, ...require('../memory/embeddings').status() });
+  res.json({ ok: true, hits: require('../memory/embeddings').search(q, Number(req.query.limit || 8)) });
+});
+
+app.post('/api/memory/reindex', auth, (_req, res) => {
+  res.json(require('../memory/semantic').reindexAll());
+});
+
+app.get('/api/clients', auth, (_req, res) => {
+  res.json(require('../tools/clients').list());
+});
+
+app.post('/api/clients', auth, (req, res) => {
+  res.json(require('../tools/clients').upsertClient(req.body || {}));
+});
+
+app.get('/api/macros', auth, (_req, res) => {
+  res.json(require('../tools/macros').list());
+});
+
+app.post('/api/macros', auth, (req, res) => {
+  res.json(require('../tools/macros').saveMacro(req.body || {}));
+});
+
+app.post('/api/session/export', auth, (req, res) => {
+  res.json(
+    require('../tools/session_export').exportSession(req.body?.sessionId || 'api', {
+      limit: req.body?.limit || 100,
+    })
+  );
 });
 
 app.get('/api/memorial-voice', auth, (_req, res) => {

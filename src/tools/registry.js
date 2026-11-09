@@ -1822,6 +1822,99 @@ builtins.tony_mcp_status = {
   },
 };
 
+builtins.memory_reindex = {
+  name: 'memory_reindex',
+  description: 'Rebuild local vector embeddings index from semantic facts',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('../memory/semantic').reindexAll();
+  },
+};
+
+builtins.memory_vector_search = {
+  name: 'memory_vector_search',
+  description: 'Semantic vector search over local embeddings index',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      limit: { type: 'number' },
+    },
+    required: ['query'],
+  },
+  async execute({ query, limit = 8 }) {
+    return { ok: true, hits: require('../memory/embeddings').search(query, limit) };
+  },
+};
+
+builtins.client_list = {
+  name: 'client_list',
+  description: 'List tracked clients/contacts (local JSON, no secrets)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./clients').list();
+  },
+};
+
+builtins.client_upsert = {
+  name: 'client_upsert',
+  description: 'Add/update a client record with optional note',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      company: { type: 'string' },
+      notes: { type: 'string' },
+      status: { type: 'string' },
+    },
+    required: ['name'],
+  },
+  async execute(args = {}) {
+    return require('./clients').upsertClient(args);
+  },
+};
+
+builtins.macro_list = {
+  name: 'macro_list',
+  description: 'List saved operator macros/shortcuts',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./macros').list();
+  },
+};
+
+builtins.macro_save = {
+  name: 'macro_save',
+  description: 'Save an operator macro shortcut (name → command text)',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      command: { type: 'string' },
+    },
+    required: ['name', 'command'],
+  },
+  async execute({ name, command }) {
+    return require('./macros').saveMacro({ name, command });
+  },
+};
+
+builtins.export_session = {
+  name: 'export_session',
+  description: 'Export a chat session transcript to data/reports',
+  parameters: {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      limit: { type: 'number' },
+    },
+    required: ['sessionId'],
+  },
+  async execute({ sessionId, limit = 100 }) {
+    return require('./session_export').exportSession(sessionId, { limit });
+  },
+};
+
 builtins.memorial_voice_register = {
   name: 'memorial_voice_register',
   description:

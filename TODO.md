@@ -1,6 +1,6 @@
 # TONY — Operator Roadmap
 
-Last updated: 2026-11-09 (v2.13)
+Last updated: 2026-11-09 (v2.14)
 
 Incremental improvements only. Do not rebuild from scratch.
 
@@ -38,23 +38,25 @@ Incremental improvements only. Do not rebuild from scratch.
 - [x] Encrypted preference vault option
 - [x] Skill drafts from successful traces
 - [x] TONY MCP tool server for Cursor
+- [x] Local vector embeddings + memory reindex
+- [x] Streaming ElevenLabs/local TTS audio chunks
+- [x] Client tracker + operator macros + session export
 
 ## Next
 
 ### Hardening
-- [ ] Streaming ElevenLabs TTS audio chunks
-- [ ] Vector embeddings for semantic search
+- [ ] sqlite-vec optional backend for larger corpora
+- [ ] Persistent LangGraph-style checkpoints
 
 ## New demos
 
 ```text
-Tony daily briefing
-Tony reminder in 30 minutes: call client
-Tony switch workspace
+Tony add client Acme: wants dark mode
+Tony save macro status: repo check karo
+Tony run macro status
+Tony reindex memory
+Tony vector search automation
+Tony export session
 Tony memorial voice
-Tony trusted mode on
-Tony research groq rate limits
-Tony create issue login bug
-Tony export delivery
-Tony trusted mode off
+Tony daily briefing
 ```

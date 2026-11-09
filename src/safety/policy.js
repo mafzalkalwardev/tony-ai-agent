@@ -98,6 +98,10 @@ const INTENT_SAFE = new Set([
   'vault_watch',
   'generate_skill',
   'prefs_vault',
+  'client_tracker',
+  'macro',
+  'export_session',
+  'memory_reindex',
 ]);
 
 const INTENT_BLOCKED = new Set(['read_secrets']);

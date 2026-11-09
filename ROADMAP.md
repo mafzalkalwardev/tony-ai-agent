@@ -69,11 +69,18 @@
 - [x] Skill draft generator from successful playbooks
 - [x] TONY MCP tool server (`/api/mcp/tony/*`) for Cursor
 
+## v2.14 (shipped)
+
+- [x] Local vector embeddings for semantic memory ranking
+- [x] Streaming TTS SSE (`/api/voice/speak/stream`)
+- [x] Client/contact tracker (local JSON)
+- [x] Operator macros + session transcript export
+
 ## v2.1 (next)
 
 - [x] Telegram / Discord channels
-- [ ] Vector embeddings for semantic search (sqlite-vec)
-- [x] Streaming Groq + ElevenLabs responses (chat SSE/WS; TTS stream later)
+- [x] Vector embeddings for semantic search (local hash-BoW; sqlite-vec optional later)
+- [x] Streaming Groq + ElevenLabs responses (chat + TTS stream)
 - [x] Obsidian sync with live vault watcher
 - [x] MCP server mode for Cursor integration
 - [x] Optional faster-whisper local STT when Deepgram offline

@@ -121,6 +121,9 @@ Use vault_watch_start / vault_sync_index for live Obsidian vault watching.
 Use generate_skill to draft skills from successful playbooks.
 Use prefs_vault_seal / prefs_vault_open when TONY_PREFS_SECRET is set.
 TONY MCP tools are available at /api/mcp/tony/* for Cursor integration.
+Use memory_vector_search / memory_reindex for local embedding search.
+Use client_list / client_upsert for client tracking (no secrets).
+Use macro_save / macro_list for operator shortcuts; export_session for transcripts.
 For big risky choices use decide_action — in trusted mode take the decision and execute; otherwise ask once.
 When a tool fails, analyze the error, apply a fix, and retry — do not repeat the same failing call unchanged.
 Use error_learn to save fixes that worked. Use self_heal on persistent failures.
@@ -819,6 +822,81 @@ async function handleLocalOperatorIntent({ routed, safety, sessionId, message })
       'generate_skill',
       result
     );
+  }
+  if (routed.intent === 'client_tracker') {
+    const clients = require('../tools/clients');
+    if (/\blist\b/i.test(message) || /\bclients?\s*$/i.test(message.trim())) {
+      const listed = clients.list();
+      return reply(
+        listed.clients.length
+          ? `# Clients\n${listed.clients.map((c) => `- **${c.name}** ${c.company || ''} _(notes: ${(c.notes || []).length})_`).join('\n')}`
+          : 'No clients yet. Say `Tony add client Acme: wants dark mode`.',
+        'client_list',
+        listed
+      );
+    }
+    const m = String(message || '').match(/\b(?:add\s+client|client\s+add|client\s+note)\s+([^:]+)(?::\s*(.*))?$/i);
+    const name = m?.[1]?.trim() || String(message || '').replace(/.*\bclient\b/i, '').trim();
+    const notes = m?.[2]?.trim() || '';
+    const result = clients.upsertClient({ name: name || 'Client', notes });
+    return reply(
+      result.ok ? `Saved client **${result.client.name}**. Notes: ${(result.client.notes || []).length}` : result.error,
+      'client_upsert',
+      result
+    );
+  }
+  if (routed.intent === 'macro') {
+    const macros = require('../tools/macros');
+    if (/\blist\b/i.test(message)) {
+      const listed = macros.list();
+      return reply(
+        listed.macros.length
+          ? `# Macros\n${listed.macros.map((m) => `- **${m.name}** → \`${m.command}\``).join('\n')}`
+          : 'No macros. Save with `Tony save macro status: repo check karo`.',
+        'macro_list',
+        listed
+      );
+    }
+    const runMatch = String(message || '').match(/\brun\s+macro\s+(.+)$/i);
+    if (runMatch) {
+      const found = macros.getMacro(runMatch[1].trim());
+      if (!found.ok) return reply(found.error, 'macro_list', found);
+      // Re-enter agent with the macro command text.
+      return runAgent({ sessionId, message: found.macro.command });
+    }
+    const saveMatch = String(message || '').match(/\bsave\s+macro\s+([^:]+):\s*(.+)$/i);
+    if (saveMatch) {
+      const result = macros.saveMacro({ name: saveMatch[1].trim(), command: saveMatch[2].trim() });
+      return reply(result.ok ? `Macro **${result.macro.name}** saved.` : result.error, 'macro_save', result);
+    }
+    return reply(
+      'Macros: `Tony save macro status: repo check karo` · `Tony run macro status` · `Tony macro list`',
+      'macro_list',
+      macros.list()
+    );
+  }
+  if (routed.intent === 'export_session') {
+    const result = require('../tools/session_export').exportSession(sessionId);
+    return reply(
+      result.ok ? `Session exported (${result.turns} turns) → \`${result.savedPath}\`` : result.error,
+      'export_session',
+      result
+    );
+  }
+  if (routed.intent === 'memory_reindex') {
+    if (/\bvector\s+search\b/i.test(message)) {
+      const q = String(message || '').replace(/.*\bvector\s+search\b[:\s-]*/i, '').trim() || 'tony';
+      const hits = require('../memory/embeddings').search(q, 8);
+      return reply(
+        hits.length
+          ? `# Vector search\n${hits.map((h) => `- (${h.score.toFixed(2)}) ${h.text}`).join('\n')}`
+          : 'No embedding hits. Remember facts first, then `Tony reindex memory`.',
+        'memory_vector_search',
+        { hits }
+      );
+    }
+    const result = require('../memory/semantic').reindexAll();
+    return reply(`Reindexed **${result.indexed}** facts into local embeddings.`, 'memory_reindex', result);
   }
   if (routed.intent === 'prefs_vault') {
     const vault = require('../tools/pref_vault');

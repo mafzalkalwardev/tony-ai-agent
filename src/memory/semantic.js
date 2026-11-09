@@ -20,9 +20,15 @@ function save(data) {
 
 function rememberFact(text, tags = []) {
   const data = load();
-  data.facts.push({ text, tags, at: new Date().toISOString() });
+  const fact = { text, tags, at: new Date().toISOString() };
+  data.facts.push(fact);
   if (data.facts.length > 500) data.facts = data.facts.slice(-500);
   save(data);
+  try {
+    require('./embeddings').indexText(`fact-${Date.now()}`, text, { tags });
+  } catch {
+    /* ignore */
+  }
   return data.facts[data.facts.length - 1];
 }
 
@@ -35,11 +41,44 @@ function setPreference(key, value) {
 function search(query, limit = 8) {
   const q = query.toLowerCase();
   const data = load();
-  const hits = data.facts.filter((f) => f.text.toLowerCase().includes(q));
+  const substringHits = data.facts
+    .filter((f) => f.text.toLowerCase().includes(q))
+    .map((f) => ({ ...f, score: 1, match: 'substring' }));
+
+  let vectorHits = [];
+  try {
+    vectorHits = require('./embeddings')
+      .search(query, limit)
+      .map((h) => ({
+        text: h.text,
+        tags: h.meta?.tags || ['embedding'],
+        at: h.at,
+        score: h.score,
+        match: 'vector',
+      }));
+  } catch {
+    vectorHits = [];
+  }
+
   const prefs = Object.entries(data.preferences)
     .filter(([k, v]) => `${k} ${v}`.toLowerCase().includes(q))
-    .map(([k, v]) => ({ text: `Preference: ${k} = ${v}`, tags: ['preference'] }));
-  return [...hits, ...prefs].slice(0, limit);
+    .map(([k, v]) => ({ text: `Preference: ${k} = ${v}`, tags: ['preference'], score: 0.9, match: 'pref' }));
+
+  const merged = [];
+  const seen = new Set();
+  for (const hit of [...substringHits, ...vectorHits, ...prefs].sort((a, b) => (b.score || 0) - (a.score || 0))) {
+    const key = String(hit.text || '').slice(0, 160);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(hit);
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }
 
-module.exports = { load, rememberFact, setPreference, search };
+function reindexAll() {
+  const data = load();
+  return require('./embeddings').reindexFacts(data.facts || []);
+}
+
+module.exports = { load, rememberFact, setPreference, search, reindexAll };

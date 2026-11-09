@@ -1,7 +1,7 @@
 {
   "name": "tony-agent",
-  "version": "2.13.0",
-  "description": "TONY — trusted laptop operator, memorial voice, Telegram/Discord, workspaces, reminders, vault watch, streaming chat, skill drafts, MCP tool server, JARVIS, companion mode",
+  "version": "2.14.0",
+  "description": "TONY — trusted laptop operator with memorial voice, vector memory, streaming TTS, clients/macros, Discord/Telegram, vault watch, MCP, JARVIS",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
