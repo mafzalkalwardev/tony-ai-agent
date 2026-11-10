@@ -300,7 +300,13 @@ See `TONY.md` for persona, operating loop, and identity.
 ## Docker
 
 ```bash
+# local/dev
 docker compose up -d
+
+# VPS production (Caddy HTTPS) — see DEPLOY.md
+cp .env.example .env   # set TONY_API_TOKEN, GROQ_API_KEY, TONY_DOMAIN
+npm run prod:up
+# or from laptop: VPS_HOST=... VPS_USER=root npm run deploy:vps
 ```
 
 ## GitHub

@@ -149,7 +149,15 @@ module.exports = {
   maxIterations: Number(env('TONY_MAX_ITERATIONS', '12')),
   autoReflect: env('TONY_AUTO_REFLECT', 'true') === 'true',
   workspaceRoot: path.resolve(root, env('TONY_WORKSPACE_ROOT', '.')),
-  apiToken: env('TONY_API_TOKEN', 'dev_tony_token'),
+  apiToken: (() => {
+    const token = env('TONY_API_TOKEN', 'dev_tony_token');
+    const isProd = env('TONY_ENV', '') === 'production' || env('NODE_ENV', '') === 'production';
+    if (isProd && (!token || token === 'dev_tony_token' || token === 'change_me_tony_gateway_token' || token === 'docker_tony_token')) {
+      console.warn('[tony] WARNING: weak/default TONY_API_TOKEN in production — set a strong token');
+    }
+    return token;
+  })(),
+  envName: env('TONY_ENV', env('NODE_ENV', 'development')),
   signalmint: {
     apiUrl: env('SIGNALMINT_API_URL', 'http://localhost:5000'),
     email: env('SIGNALMINT_EMAIL', ''),

@@ -84,6 +84,12 @@
 - [x] DataDir backup (secret-skipping tar)
 - [x] Focus / pomodoro timer
 
+## v2.16 (shipped)
+
+- [x] Production VPS deploy pack (Docker + Caddy HTTPS)
+- [x] `scripts/deploy-vps.sh` + GitHub Actions deploy workflow
+- [x] systemd unit + DEPLOY.md
+
 ## v2.1 (next)
 
 - [x] Telegram / Discord channels

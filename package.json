@@ -28,6 +28,9 @@
     "mcp:stack": "node scripts/start-mcp-stack.js",
     "tony:daemon": "node src/daemon/index.js",
     "desktop": "node scripts/launch-desktop.js",
+    "deploy:vps": "bash scripts/deploy-vps.sh",
+    "prod:up": "docker compose -f deploy/docker-compose.prod.yml --env-file .env up -d --build",
+    "prod:down": "docker compose -f deploy/docker-compose.prod.yml --env-file .env down",
     "openwiki:init": "npx --yes @langchain/openwiki --init -p || echo Install openwiki CLI separately"
   },
   "engines": {

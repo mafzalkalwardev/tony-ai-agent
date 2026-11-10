@@ -1,3 +1,4 @@
+# Local/dev compose. For VPS production use: deploy/docker-compose.prod.yml
 services:
   tony:
     build: .
@@ -10,12 +11,16 @@ services:
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
       OBSIDIAN_VAULT_PATH: /app/vault
-      TONY_API_TOKEN: docker_tony_token
-      TONY_WORKSPACE_ROOT: /workspace
+      TONY_API_TOKEN: ${TONY_API_TOKEN:-docker_tony_token}
+      TONY_WORKSPACE_ROOT: /app
     volumes:
-      - ${TONY_WORKSPACE_HOST:-D:/}:/workspace:ro
       - ./vault:/app/vault
       - tony_data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
 volumes:
   tony_data:

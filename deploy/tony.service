@@ -1,0 +1,23 @@
+[Unit]
+Description=TONY AI Agent gateway
+After=network.target
+
+[Service]
+Type=simple
+User=tony
+WorkingDirectory=/opt/tony-ai-agent
+EnvironmentFile=/opt/tony-ai-agent/.env
+ExecStart=/usr/bin/node src/gateway/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=TONY_ENV=production
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/tony-ai-agent/data /opt/tony-ai-agent/vault
+
+[Install]
+WantedBy=multi-user.target
