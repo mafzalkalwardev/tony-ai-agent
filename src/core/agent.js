@@ -124,6 +124,8 @@ TONY MCP tools are available at /api/mcp/tony/* for Cursor integration.
 Use memory_vector_search / memory_reindex for local embedding search.
 Use client_list / client_upsert for client tracking (no secrets).
 Use macro_save / macro_list for operator shortcuts; export_session for transcripts.
+Use checkpoint_save/list/restore for session snapshots; audit_recent for safety audit.
+Use changelog_digest, backup_data, focus_start/stop for operator hygiene.
 For big risky choices use decide_action — in trusted mode take the decision and execute; otherwise ask once.
 When a tool fails, analyze the error, apply a fix, and retry — do not repeat the same failing call unchanged.
 Use error_learn to save fixes that worked. Use self_heal on persistent failures.
@@ -880,6 +882,86 @@ async function handleLocalOperatorIntent({ routed, safety, sessionId, message })
     return reply(
       result.ok ? `Session exported (${result.turns} turns) → \`${result.savedPath}\`` : result.error,
       'export_session',
+      result
+    );
+  }
+  if (routed.intent === 'checkpoint') {
+    const cp = require('./checkpoints');
+    if (/\blist\b/i.test(message)) {
+      const listed = cp.listCheckpoints();
+      return reply(
+        listed.checkpoints.length
+          ? `# Checkpoints\n${listed.checkpoints.map((c) => `- \`${c.sessionId}\` ${c.turns} turns @ ${c.savedAt}`).join('\n')}`
+          : 'No checkpoints yet. Say `Tony save checkpoint`.',
+        'checkpoint_list',
+        listed
+      );
+    }
+    if (/\brestore\b/i.test(message)) {
+      const result = cp.restoreCheckpoint(sessionId);
+      return reply(
+        result.ok ? `Restored checkpoint (${result.restored} turns) from ${result.savedAt}` : result.error,
+        'checkpoint_restore',
+        result
+      );
+    }
+    const result = cp.saveCheckpoint(sessionId, { label: 'manual', note: message });
+    return reply(
+      result.ok ? `Checkpoint saved (${result.turns} turns) → \`${result.path}\`` : result.error,
+      'checkpoint_save',
+      result
+    );
+  }
+  if (routed.intent === 'audit_log') {
+    const entries = require('../safety/audit').recent(25);
+    return reply(
+      entries.length
+        ? `# Audit log\n${entries.map((e) => `- ${e.at} **${e.type}** ${e.action} — ${e.detail}`).join('\n')}`
+        : 'Audit log empty.',
+      'audit_recent',
+      { entries }
+    );
+  }
+  if (routed.intent === 'changelog') {
+    const sinceMatch = String(message || '').match(/\bsince\s+(.+)$/i);
+    const since = sinceMatch ? sinceMatch[1].trim() : '7 days ago';
+    const dig = require('../tools/changelog').exportDigest({ since });
+    return reply(`${dig.markdown}\n\nSaved: \`${dig.savedPath}\``, 'changelog_digest', dig);
+  }
+  if (routed.intent === 'backup') {
+    const result = require('../tools/backup').createBackup();
+    return reply(
+      result.ok
+        ? `Backup created (${result.fileCount} files, ${result.bytes} bytes) → \`${result.savedPath}\``
+        : result.error,
+      'backup_data',
+      result
+    );
+  }
+  if (routed.intent === 'focus_timer') {
+    const focus = require('../tools/focus_timer');
+    if (/\bstop\b/i.test(message)) {
+      const result = focus.stop({ complete: true });
+      return reply(result.ok ? `Focus stopped. Completed: ${result.session.completed}` : result.error, 'focus_stop', result);
+    }
+    if (/\bstatus\b/i.test(message)) {
+      const st = focus.status();
+      if (!st.active) return reply('No active focus session.', 'focus_status', st);
+      const mins = Math.ceil((st.remainingMs || 0) / 60000);
+      return reply(
+        `Focus **${st.active.label}** — ${mins} min left (ends ${st.active.endsAt})`,
+        'focus_status',
+        st
+      );
+    }
+    const minsMatch = String(message || '').match(/\b(\d+)\s*(min|minute|minutes)\b/i);
+    const minutes = minsMatch ? Number(minsMatch[1]) : 25;
+    const result = focus.start({ minutes, label: 'Focus' });
+    return reply(
+      result.ok
+        ? `Focus started: **${result.active.minutes} min** until ${result.active.endsAt}`
+        : result.error,
+      'focus_start',
       result
     );
   }

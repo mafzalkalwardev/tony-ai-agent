@@ -1,62 +1,32 @@
 # TONY — Operator Roadmap
 
-Last updated: 2026-11-09 (v2.14)
+Last updated: 2026-11-09 (v2.15)
 
 Incremental improvements only. Do not rebuild from scratch.
 
 ## Complete
 
-- [x] ReAct agent + JARVIS UI + companion wake mode
-- [x] Safety levels SAFE / NEEDS_APPROVAL / BLOCKED
-- [x] Intent router with categories + Roman Urdu examples
-- [x] Project scanner / test+build runners / delivery helper / clipboard
-- [x] Pending approval queue + dashboard YES/NO
-- [x] Operator strip (status, transcript, intent, task)
-- [x] Local-first TTS + silence thresholds
-- [x] Parameter extraction (search query, file path, app name, topics)
-- [x] GitHub helpers: summarize repo, explain changes, commit draft, PR checklist
-- [x] Web search + open_app tools
-- [x] Preferences store (no secrets) + recent commands
-- [x] Delivery export to `data/reports/`
-- [x] Optional faster-whisper local STT bridge script
-- [x] Large-file overwrite approval gate
-- [x] Approve-and-run for tests/build/search/shell
-- [x] Trusted Operator Mode (opt-in full laptop + web research autonomy)
-- [x] Decision engine for big/risky choices
-- [x] Expanded desktop control (scroll/drag/doubleclick/sequence)
-- [x] Full-web research + browse any public http(s) site
-- [x] Memorial voice consent flow
-- [x] Telegram + Discord channels
-- [x] Multi-repo workspace picker
-- [x] Auto-attach latest test report into delivery export
-- [x] Richer GitHub PR/issue create via `gh` after trusted/approval
-- [x] Per-tool rate limits for shell / outbound messaging
-- [x] Local reminders + daily briefing
-- [x] Calibrate browser always-listen with silenceStopSeconds from settings
-- [x] Obsidian vault live watcher
-- [x] Streaming chat SSE/WS deltas
-- [x] Encrypted preference vault option
-- [x] Skill drafts from successful traces
-- [x] TONY MCP tool server for Cursor
-- [x] Local vector embeddings + memory reindex
-- [x] Streaming ElevenLabs/local TTS audio chunks
-- [x] Client tracker + operator macros + session export
+- [x] Operator core through v2.14 (memorial voice, remotes, workspaces, vector memory, macros, …)
+- [x] Session checkpoints (save/list/restore)
+- [x] Operator audit log
+- [x] Changelog digest from git
+- [x] DataDir backup (skips secrets)
+- [x] Focus / pomodoro timer
 
 ## Next
 
 ### Hardening
 - [ ] sqlite-vec optional backend for larger corpora
-- [ ] Persistent LangGraph-style checkpoints
+- [ ] Multi-user encrypted memory partitions
 
 ## New demos
 
 ```text
-Tony add client Acme: wants dark mode
-Tony save macro status: repo check karo
-Tony run macro status
-Tony reindex memory
-Tony vector search automation
-Tony export session
+Tony save checkpoint
+Tony changelog
+Tony backup data
+Tony start focus 25 minutes
+Tony audit log
 Tony memorial voice
 Tony daily briefing
 ```

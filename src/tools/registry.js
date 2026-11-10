@@ -526,6 +526,17 @@ const builtins = {
         };
       }
       logCommand(command, { approved, level: check.level, tool: 'shell' });
+      try {
+        require('../safety/audit').record({
+          type: 'shell_run',
+          action: 'shell',
+          detail: command,
+          level: check.level,
+          ok: true,
+        });
+      } catch {
+        /* ignore */
+      }
       const out = execSync(command, {
         cwd: config.workspaceRoot,
         encoding: 'utf8',
@@ -1912,6 +1923,121 @@ builtins.export_session = {
   },
   async execute({ sessionId, limit = 100 }) {
     return require('./session_export').exportSession(sessionId, { limit });
+  },
+};
+
+builtins.checkpoint_save = {
+  name: 'checkpoint_save',
+  description: 'Save a LangGraph-style session checkpoint',
+  parameters: {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      label: { type: 'string' },
+      note: { type: 'string' },
+    },
+    required: ['sessionId'],
+  },
+  async execute({ sessionId, label, note }) {
+    return require('../core/checkpoints').saveCheckpoint(sessionId, { label, note });
+  },
+};
+
+builtins.checkpoint_list = {
+  name: 'checkpoint_list',
+  description: 'List saved session checkpoints',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('../core/checkpoints').listCheckpoints();
+  },
+};
+
+builtins.checkpoint_restore = {
+  name: 'checkpoint_restore',
+  description: 'Restore a session checkpoint back into episodic memory',
+  parameters: {
+    type: 'object',
+    properties: { sessionId: { type: 'string' } },
+    required: ['sessionId'],
+  },
+  async execute({ sessionId }) {
+    return require('../core/checkpoints').restoreCheckpoint(sessionId);
+  },
+};
+
+builtins.audit_recent = {
+  name: 'audit_recent',
+  description: 'Show recent operator audit log entries',
+  parameters: {
+    type: 'object',
+    properties: { limit: { type: 'number' } },
+  },
+  async execute({ limit = 30 } = {}) {
+    return { ok: true, entries: require('../safety/audit').recent(limit) };
+  },
+};
+
+builtins.changelog_digest = {
+  name: 'changelog_digest',
+  description: 'Generate a changelog digest from git history',
+  parameters: {
+    type: 'object',
+    properties: {
+      since: { type: 'string' },
+      export: { type: 'boolean' },
+    },
+  },
+  async execute({ since = '7 days ago', export: doExport = false } = {}) {
+    const changelog = require('./changelog');
+    return doExport ? changelog.exportDigest({ since }) : changelog.digest({ since });
+  },
+};
+
+builtins.backup_data = {
+  name: 'backup_data',
+  description: 'Create a tar backup of TONY dataDir (skips secret-like files)',
+  parameters: {
+    type: 'object',
+    properties: { label: { type: 'string' } },
+  },
+  async execute({ label = 'tony-data' } = {}) {
+    return require('./backup').createBackup({ label });
+  },
+};
+
+builtins.focus_start = {
+  name: 'focus_start',
+  description: 'Start a focus/pomodoro timer',
+  parameters: {
+    type: 'object',
+    properties: {
+      minutes: { type: 'number' },
+      label: { type: 'string' },
+    },
+  },
+  async execute({ minutes = 25, label = 'Focus' } = {}) {
+    return require('./focus_timer').start({ minutes, label });
+  },
+};
+
+builtins.focus_status = {
+  name: 'focus_status',
+  description: 'Show active focus timer status',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./focus_timer').status();
+  },
+};
+
+builtins.focus_stop = {
+  name: 'focus_stop',
+  description: 'Stop the active focus timer',
+  parameters: {
+    type: 'object',
+    properties: { complete: { type: 'boolean' } },
+  },
+  async execute({ complete = false } = {}) {
+    return require('./focus_timer').stop({ complete });
   },
 };
 

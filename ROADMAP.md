@@ -76,6 +76,14 @@
 - [x] Client/contact tracker (local JSON)
 - [x] Operator macros + session transcript export
 
+## v2.15 (shipped)
+
+- [x] Session checkpoints (save/list/restore)
+- [x] Append-only operator audit log
+- [x] Git changelog digest + export
+- [x] DataDir backup (secret-skipping tar)
+- [x] Focus / pomodoro timer
+
 ## v2.1 (next)
 
 - [x] Telegram / Discord channels
@@ -87,7 +95,7 @@
 
 ## v3.0 (vision)
 
-- [ ] Persistent agent graph (LangGraph-style checkpoints)
+- [x] Persistent agent graph (LangGraph-style checkpoints) — session snapshots
 - [x] Self-improving skill generation from successful traces (drafts)
 - [ ] Multi-user tenancy with encrypted memory partitions
 - [ ] Charlie OS desktop tray / system service

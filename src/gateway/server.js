@@ -42,7 +42,7 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.14.0',
+    version: '2.15.0',
     llm: config.llmProvider,
     operator: {
       categories: require('../core/intent_router').CATEGORIES,
@@ -61,6 +61,9 @@ app.get('/health', async (_req, res) => {
       embeddings: require('../memory/embeddings').status(),
       clients: require('../tools/clients').list().clients.length,
       macros: require('../tools/macros').list().macros.length,
+      audit: require('../safety/audit').status(),
+      focus: require('../tools/focus_timer').status(),
+      checkpoints: require('../core/checkpoints').listCheckpoints().checkpoints.length,
     },
     llmChain: require('../llm').providerStatus(),
     online,
@@ -754,6 +757,52 @@ app.post('/api/session/export', auth, (req, res) => {
       limit: req.body?.limit || 100,
     })
   );
+});
+
+app.get('/api/checkpoints', auth, (_req, res) => {
+  res.json(require('../core/checkpoints').listCheckpoints());
+});
+
+app.post('/api/checkpoints', auth, (req, res) => {
+  const cp = require('../core/checkpoints');
+  const action = req.body?.action || 'save';
+  const sessionId = req.body?.sessionId || 'api';
+  if (action === 'restore') return res.json(cp.restoreCheckpoint(sessionId));
+  if (action === 'load') return res.json(cp.loadCheckpoint(sessionId));
+  return res.json(cp.saveCheckpoint(sessionId, { label: req.body?.label, note: req.body?.note }));
+});
+
+app.get('/api/audit', auth, (req, res) => {
+  res.json({ ok: true, entries: require('../safety/audit').recent(Number(req.query.limit || 50)) });
+});
+
+app.get('/api/changelog', auth, (req, res) => {
+  const since = req.query.since || '7 days ago';
+  res.json(require('../tools/changelog').digest({ since }));
+});
+
+app.post('/api/changelog/export', auth, (req, res) => {
+  res.json(require('../tools/changelog').exportDigest({ since: req.body?.since || '7 days ago' }));
+});
+
+app.get('/api/backups', auth, (_req, res) => {
+  res.json(require('../tools/backup').listBackups());
+});
+
+app.post('/api/backups', auth, (req, res) => {
+  res.json(require('../tools/backup').createBackup({ label: req.body?.label || 'tony-data' }));
+});
+
+app.get('/api/focus', auth, (_req, res) => {
+  res.json(require('../tools/focus_timer').status());
+});
+
+app.post('/api/focus', auth, (req, res) => {
+  const focus = require('../tools/focus_timer');
+  const action = req.body?.action || 'start';
+  if (action === 'stop') return res.json(focus.stop({ complete: Boolean(req.body?.complete) }));
+  if (action === 'status') return res.json(focus.status());
+  return res.json(focus.start({ minutes: req.body?.minutes, label: req.body?.label }));
 });
 
 app.get('/api/memorial-voice', auth, (_req, res) => {

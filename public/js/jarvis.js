@@ -433,6 +433,31 @@
         }))
       )
     );
+    $('#btnChangelog')?.addEventListener('click', () =>
+      operatorAction('changelog', () =>
+        api('/api/changelog').then((r) => ({ markdown: r.markdown || JSON.stringify(r, null, 2) }))
+      )
+    );
+    $('#btnFocus')?.addEventListener('click', () =>
+      operatorAction('focus', () =>
+        api('/api/focus', { method: 'POST', body: JSON.stringify({ action: 'start', minutes: 25 }) }).then(
+          (r) => ({
+            markdown: r.ok
+              ? `Focus started: **${r.active.minutes} min** until ${r.active.endsAt}`
+              : r.error || 'Focus failed',
+          })
+        )
+      )
+    );
+    $('#btnBackup')?.addEventListener('click', () =>
+      operatorAction('backup', () =>
+        api('/api/backups', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({
+          markdown: r.ok
+            ? `Backup saved → \`${r.savedPath}\` (${r.fileCount} files)`
+            : r.error || 'Backup failed',
+        }))
+      )
+    );
     $('#btnExportDelivery')?.addEventListener('click', () =>
       operatorAction('export delivery', () =>
         api('/api/delivery/export', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({

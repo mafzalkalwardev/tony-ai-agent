@@ -102,6 +102,11 @@ const INTENT_SAFE = new Set([
   'macro',
   'export_session',
   'memory_reindex',
+  'checkpoint',
+  'audit_log',
+  'changelog',
+  'backup',
+  'focus_timer',
 ]);
 
 const INTENT_BLOCKED = new Set(['read_secrets']);

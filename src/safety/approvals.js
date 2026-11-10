@@ -39,6 +39,17 @@ function create({ action, command, reason, sessionId = '', meta = {} }) {
   data.pending.unshift(item);
   data.pending = data.pending.slice(0, 50);
   save(data);
+  try {
+    require('./audit').record({
+      type: 'approval_created',
+      action,
+      detail: `${command} — ${reason}`,
+      sessionId,
+      level: 'NEEDS_APPROVAL',
+    });
+  } catch {
+    /* ignore */
+  }
   return item;
 }
 
@@ -53,6 +64,17 @@ function decide(id, approved) {
   item.status = approved ? 'approved' : 'rejected';
   item.decidedAt = new Date().toISOString();
   save(data);
+  try {
+    require('./audit').record({
+      type: approved ? 'approval_granted' : 'approval_rejected',
+      action: item.action,
+      detail: item.command,
+      sessionId: item.sessionId,
+      ok: approved,
+    });
+  } catch {
+    /* ignore */
+  }
   return item;
 }
 

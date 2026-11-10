@@ -208,6 +208,46 @@ const RULES = [
     ],
   },
   {
+    category: 'settings',
+    intent: 'checkpoint',
+    patterns: [
+      /\bcheckpoint\b/i,
+      /\bsave\s+checkpoint\b/i,
+      /\brestore\s+checkpoint\b/i,
+      /\blist\s+checkpoints\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'audit_log',
+    patterns: [/\baudit\s+log\b/i, /\bshow\s+audit\b/i, /\baudit\s+recent\b/i],
+  },
+  {
+    category: 'github_task',
+    intent: 'changelog',
+    patterns: [
+      /\bchangelog\b/i,
+      /\bchange\s+log\b/i,
+      /\bdigest\s+commits\b/i,
+      /\bwhats?\s+new\b/i,
+    ],
+  },
+  {
+    category: 'settings',
+    intent: 'backup',
+    patterns: [/\bbackup\s+(data|tony)\b/i, /\btony\s+backup\b/i, /\bcreate\s+backup\b/i],
+  },
+  {
+    category: 'settings',
+    intent: 'focus_timer',
+    patterns: [
+      /\bfocus\s+(timer|mode|start|stop|status)?\b/i,
+      /\bpomodoro\b/i,
+      /\bstart\s+focus\b/i,
+      /\bstop\s+focus\b/i,
+    ],
+  },
+  {
     category: 'run_tests',
     intent: 'run_tests',
     patterns: [

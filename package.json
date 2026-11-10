@@ -1,7 +1,7 @@
 {
   "name": "tony-agent",
-  "version": "2.14.0",
-  "description": "TONY — trusted laptop operator with memorial voice, vector memory, streaming TTS, clients/macros, Discord/Telegram, vault watch, MCP, JARVIS",
+  "version": "2.15.0",
+  "description": "TONY — trusted laptop operator with checkpoints, audit log, changelog, backups, focus timer, memorial voice, vector memory, MCP, JARVIS",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {

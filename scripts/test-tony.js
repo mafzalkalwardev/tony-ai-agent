@@ -151,6 +151,11 @@ async function main() {
   assert('intent macro', intentRouter.route('Tony save macro status: repo check').intent === 'macro');
   assert('intent export session', intentRouter.route('Tony export session').intent === 'export_session');
   assert('intent memory reindex', intentRouter.route('Tony reindex memory').intent === 'memory_reindex');
+  assert('intent checkpoint', intentRouter.route('Tony save checkpoint').intent === 'checkpoint');
+  assert('intent audit', intentRouter.route('Tony audit log').intent === 'audit_log');
+  assert('intent changelog', intentRouter.route('Tony changelog').intent === 'changelog');
+  assert('intent backup', intentRouter.route('Tony backup data').intent === 'backup');
+  assert('intent focus', intentRouter.route('Tony start focus 25 minutes').intent === 'focus_timer');
   assert('intent open vscode', intentRouter.route('VS Code kholo').intent === 'open_app');
 
   const params = require('../src/core/params');
@@ -313,6 +318,32 @@ async function main() {
   assert('client tool', Boolean(getTool('client_upsert')));
   assert('macro tool', Boolean(getTool('macro_save')));
   assert('vector search tool', Boolean(getTool('memory_vector_search')));
+
+  const sid2 = randomUUID();
+  memory.appendEpisode(sid2, 'user', 'checkpoint test');
+  const cp = require('../src/core/checkpoints');
+  assert('checkpoint save', cp.saveCheckpoint(sid2, { label: 'test' }).ok === true);
+  assert('checkpoint list', cp.listCheckpoints().checkpoints.some((c) => c.sessionId === sid2));
+
+  const audit = require('../src/safety/audit');
+  audit.record({ type: 'test_event', action: 'unit', detail: 'hello audit' });
+  assert('audit recent', audit.recent(5).some((e) => e.type === 'test_event'));
+
+  const changelog = require('../src/tools/changelog');
+  assert('changelog digest', changelog.digest({ since: '30 days ago' }).ok === true);
+
+  const backup = require('../src/tools/backup');
+  const bak = backup.createBackup({ label: 'test-bak' });
+  assert('backup create', bak.ok === true && bak.fileCount >= 1);
+
+  const focus = require('../src/tools/focus_timer');
+  focus.stop();
+  assert('focus start', focus.start({ minutes: 1, label: 'test' }).ok === true);
+  assert('focus status active', Boolean(focus.status().active));
+  assert('focus stop', focus.stop({ complete: true }).ok === true);
+  assert('checkpoint tool', Boolean(getTool('checkpoint_save')));
+  assert('audit tool', Boolean(getTool('audit_recent')));
+  assert('focus tool', Boolean(getTool('focus_start')));
 
   const web = require('../src/tools/web_search');
   assert('web search url', web.buildSearchUrl('tony ai').includes('duckduckgo.com'));
