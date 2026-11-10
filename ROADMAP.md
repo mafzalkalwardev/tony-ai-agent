@@ -25,17 +25,83 @@
 - [x] Voice WebSocket + REST endpoints
 - [x] GitHub CI workflow
 
+## v2.8 (shipped)
+
+- [x] Intent router + Roman Urdu operator commands
+- [x] Expanded safety (deploy, deceptive deepfake block, memorial voice consent, approval queue)
+- [x] Memorial voice cloning (consent-gated + ElevenLabs Instant Voice Clone)
+- [x] Telegram remote channel
+- [x] Playwright browser operator + gh create issue/PR
+- [x] Project scanner + test/build runners + delivery helper
+- [x] JARVIS operator strip (transcript, intent, approvals)
+- [x] Local-first TTS preference + silence threshold config
+
+## v2.9 (shipped)
+
+- [x] Parameter extraction for search/file/app/topics
+- [x] GitHub summarize / explain changes / commit + PR prep helpers
+- [x] Web search + open_app tools
+- [x] Preferences JSON (no secrets) + delivery export
+- [x] faster-whisper local STT bridge + approve-and-run actions
+- [x] Large-file overwrite approval
+
+## v2.10 (shipped)
+
+- [x] Trusted Operator Mode for full laptop + web research autonomy
+- [x] Decision engine for high-risk choices
+- [x] Expanded desktop automation sequences
+- [x] research_web / browse_site for any public http(s) URL
+
+## v2.12 (shipped)
+
+- [x] Discord remote channel (webhook outbound + incoming API)
+- [x] Multi-repo workspace picker
+- [x] Delivery auto-attaches latest test report
+- [x] Per-tool shell/outbound rate limits
+- [x] Local reminders + daily briefing
+- [x] Always-listen silence calibration from server settings
+
+## v2.13 (shipped)
+
+- [x] Obsidian live vault watcher + sync index
+- [x] Streaming chat (SSE `/api/chat/stream` + WS deltas)
+- [x] Optional encrypted preference vault (`TONY_PREFS_SECRET`)
+- [x] Skill draft generator from successful playbooks
+- [x] TONY MCP tool server (`/api/mcp/tony/*`) for Cursor
+
+## v2.14 (shipped)
+
+- [x] Local vector embeddings for semantic memory ranking
+- [x] Streaming TTS SSE (`/api/voice/speak/stream`)
+- [x] Client/contact tracker (local JSON)
+- [x] Operator macros + session transcript export
+
+## v2.15 (shipped)
+
+- [x] Session checkpoints (save/list/restore)
+- [x] Append-only operator audit log
+- [x] Git changelog digest + export
+- [x] DataDir backup (secret-skipping tar)
+- [x] Focus / pomodoro timer
+
+## v2.16 (shipped)
+
+- [x] Production VPS deploy pack (Docker + Caddy HTTPS)
+- [x] `scripts/deploy-vps.sh` + GitHub Actions deploy workflow
+- [x] systemd unit + DEPLOY.md
+
 ## v2.1 (next)
 
-- [ ] Telegram / Discord channels
-- [ ] Vector embeddings for semantic search (sqlite-vec)
-- [ ] Streaming Groq + ElevenLabs responses
-- [ ] Obsidian sync with live vault watcher
-- [ ] MCP server mode for Cursor integration
+- [x] Telegram / Discord channels
+- [x] Vector embeddings for semantic search (local hash-BoW; sqlite-vec optional later)
+- [x] Streaming Groq + ElevenLabs responses (chat + TTS stream)
+- [x] Obsidian sync with live vault watcher
+- [x] MCP server mode for Cursor integration
+- [x] Optional faster-whisper local STT when Deepgram offline
 
 ## v3.0 (vision)
 
-- [ ] Persistent agent graph (LangGraph-style checkpoints)
-- [ ] Self-improving skill generation from successful traces
+- [x] Persistent agent graph (LangGraph-style checkpoints) — session snapshots
+- [x] Self-improving skill generation from successful traces (drafts)
 - [ ] Multi-user tenancy with encrypted memory partitions
 - [ ] Charlie OS desktop tray / system service

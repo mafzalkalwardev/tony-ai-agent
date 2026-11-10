@@ -123,10 +123,18 @@
   async function loadStatus() {
     try {
       const h = await fetch('/health').then((r) => r.json());
+      window.tonyStatus = h;
       $('#statBrain').textContent = (h.llm || 'groq').toUpperCase();
       $('#statTools').textContent = h.tools || '—';
       $('#statGraph').textContent = h.mind?.graphify?.nodes || h.codegraph?.nodes || '—';
-      $('#statMode').textContent = h.online ? 'ONLINE' : 'LOCAL';
+      $('#statMode').textContent = h.operator?.trustedMode?.enabled
+        ? 'TRUSTED'
+        : h.online
+          ? 'ONLINE'
+          : 'LOCAL';
+      if ($('#trustedLabel')) {
+        $('#trustedLabel').textContent = `Trusted mode: ${h.operator?.trustedMode?.label || '—'}`;
+      }
       if (h.companion?.userName) {
         window.__tonyUserName = h.companion.userName;
         document.title = `TONY · JARVIS — ${h.companion.userName}`;
@@ -162,8 +170,74 @@
     }
   }
 
+  function updateOperatorStrip({ transcript, intent, safety, task, status, pendingApprovals }) {
+    if ($('#opStatus')) $('#opStatus').textContent = status || 'idle';
+    if ($('#opTranscript') && transcript != null) {
+      $('#opTranscript').textContent = String(transcript).slice(0, 80) || '—';
+    }
+    if ($('#opIntent') && intent) {
+      const cat = intent.category || intent.intent || 'unknown';
+      const name = intent.intent || '';
+      const level = safety?.level ? ` · ${safety.level}` : '';
+      $('#opIntent').textContent = `${cat}/${name}${level}`;
+    }
+    if ($('#opTask')) $('#opTask').textContent = task || '—';
+    const box = $('#opApprovals');
+    if (!box) return;
+    const items = pendingApprovals || [];
+    if (!items.length) {
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML = items
+      .slice(0, 3)
+      .map(
+        (a) => `<div class="approval-chip" data-id="${a.id}">
+          <span title="${(a.command || a.action || '').replace(/"/g, '&quot;')}">${(a.action || 'action').slice(0, 18)}</span>
+          <button type="button" data-approve="1">YES</button>
+          <button type="button" class="reject" data-approve="0">NO</button>
+        </div>`
+      )
+      .join('');
+    box.querySelectorAll('button[data-approve]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const chip = btn.closest('.approval-chip');
+        const id = chip?.dataset.id;
+        if (!id) return;
+        try {
+          await api(`/api/approvals/${id}`, {
+            method: 'POST',
+            body: JSON.stringify({ approved: btn.dataset.approve === '1' }),
+          });
+          await refreshApprovals();
+          addMessage(
+            'assistant',
+            btn.dataset.approve === '1'
+              ? `Approved pending action ${id.slice(0, 8)}…`
+              : `Rejected pending action ${id.slice(0, 8)}…`
+          );
+        } catch (e) {
+          addMessage('assistant', `Approval error: ${e.message}`);
+        }
+      });
+    });
+  }
+
+  async function refreshApprovals() {
+    try {
+      const data = await api('/api/operator/status');
+      updateOperatorStrip({
+        status: data.pendingApprovals?.length ? 'awaiting approval' : $('#opStatus')?.textContent || 'idle',
+        pendingApprovals: data.pendingApprovals,
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function sendChat(text) {
     addMessage('user', text);
+    updateOperatorStrip({ transcript: text, status: 'thinking', task: 'routing' });
     const thinking = document.createElement('div');
     thinking.className = 'msg thinking';
     thinking.textContent = 'Processing…';
@@ -176,6 +250,15 @@
       thinking.remove();
       sessionId = result.sessionId || sessionId;
       localStorage.setItem(SESSION_KEY, sessionId);
+      const running = result.toolResults?.map((t) => t.tool).join(', ') || 'reply';
+      updateOperatorStrip({
+        transcript: text,
+        intent: result.intent,
+        safety: result.safety,
+        task: running,
+        status: result.pendingApprovals?.length ? 'awaiting approval' : 'idle',
+        pendingApprovals: result.pendingApprovals,
+      });
       addMessage(
         'assistant',
         result.response || '(no response)',
@@ -185,6 +268,7 @@
       if (window.tonyVoice?.Voice?.voiceOut) await window.tonyVoice.speakResponse(result.response);
     } catch (e) {
       thinking.remove();
+      updateOperatorStrip({ status: 'error', task: '—' });
       addMessage('assistant', `Error: ${e.message}`);
     }
   }
@@ -212,8 +296,11 @@
     tickClock();
     setInterval(tickClock, 1000);
     loadStatus();
+    refreshApprovals();
     setInterval(loadStatus, 30000);
+    setInterval(refreshApprovals, 15000);
     window.tonyVoice?.initVoice();
+    window.tonyUpdateOperator = updateOperatorStrip;
 
     $('#chatForm').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -244,6 +331,7 @@
         result.toolResults?.map((t) => t.tool),
         window.tonyResolveAttachments?.(result)
       );
+      if (window.tonyVoice?.Voice?.voiceOut) await window.tonyVoice.speakResponse(result.response);
     });
 
     $('#rebuildGraph')?.addEventListener('click', async () => {
@@ -251,6 +339,155 @@
       initGraphCanvas();
       loadStatus();
     });
+
+    async function operatorAction(label, fn) {
+      $$('.hud-nav-btn[data-panel="command"]')[0]?.click();
+      updateOperatorStrip({ status: 'working', task: label });
+      try {
+        const result = await fn();
+        const text = result.markdown || result.response || result.savedPath || JSON.stringify(result, null, 2);
+        addMessage('assistant', typeof text === 'string' ? text : JSON.stringify(result, null, 2));
+        updateOperatorStrip({ status: 'idle', task: label });
+      } catch (e) {
+        addMessage('assistant', `${label} failed: ${e.message}`);
+        updateOperatorStrip({ status: 'error', task: label });
+      }
+    }
+
+    $('#btnRepoSummary')?.addEventListener('click', () =>
+      operatorAction('repo summary', () => api('/api/github/summary'))
+    );
+    $('#btnExplainChanges')?.addEventListener('click', () =>
+      operatorAction('explain changes', () => api('/api/github/changes'))
+    );
+    $('#btnCommitMsg')?.addEventListener('click', () =>
+      operatorAction('commit message', () =>
+        api('/api/github/commit-message', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({
+          markdown: `\`\`\`\n${r.message}\n\`\`\``,
+        }))
+      )
+    );
+    $('#btnPreparePr')?.addEventListener('click', () =>
+      operatorAction('prepare PR', () =>
+        api('/api/github/prepare-pr', { method: 'POST', body: JSON.stringify({}) })
+      )
+    );
+    $('#btnMemorialVoice')?.addEventListener('click', () =>
+      operatorAction('memorial voice', () =>
+        api('/api/memorial-voice').then((r) => {
+          const list = Array.isArray(r.voices) ? r.voices : [];
+          return {
+            markdown: `# Memorial voices\nMode: \`${r.mode}\` · registered: **${list.length}**\n\n\`\`\`json\n${JSON.stringify(
+              list,
+              null,
+              2
+            )}\n\`\`\`\n\nSay: *memorial voice* in chat to start consent-gated cloning for a loved one.`,
+          };
+        })
+      )
+    );
+    $('#btnBriefing')?.addEventListener('click', () =>
+      operatorAction('daily briefing', () => api('/api/briefing'))
+    );
+    $('#btnWorkspaces')?.addEventListener('click', () =>
+      operatorAction('workspaces', () =>
+        api('/api/workspaces').then((r) => ({
+          markdown: `# Workspaces\nActive: \`${r.activePath}\`\n\n${(r.workspaces || [])
+            .map((w) => `- ${w.active ? '✅ ' : ''}${w.name} (\`${w.id}\`) → ${w.path}`)
+            .join('\n')}`,
+        }))
+      )
+    );
+    $('#btnVaultWatch')?.addEventListener('click', () =>
+      operatorAction('vault watch', () =>
+        api('/api/vault/watch', { method: 'POST', body: JSON.stringify({ action: 'start' }) }).then((r) => ({
+          markdown: `# Vault watcher\n\`\`\`json\n${JSON.stringify(r, null, 2)}\n\`\`\``,
+        }))
+      )
+    );
+    $('#btnGenSkill')?.addEventListener('click', () =>
+      operatorAction('draft skill', () =>
+        api('/api/skills/generate', {
+          method: 'POST',
+          body: JSON.stringify({ name: 'operator-flow', query: 'operator' }),
+        }).then((r) => ({
+          markdown: `# Skill draft: ${r.id}\n\n\`\`\`md\n${String(r.content || '').slice(0, 4000)}\n\`\`\``,
+        }))
+      )
+    );
+    $('#btnClients')?.addEventListener('click', () =>
+      operatorAction('clients', () =>
+        api('/api/clients').then((r) => ({
+          markdown: `# Clients\n${(r.clients || [])
+            .map((c) => `- **${c.name}** ${c.company || ''} _(notes ${(c.notes || []).length})_`)
+            .join('\n') || '- none'}`,
+        }))
+      )
+    );
+    $('#btnMacros')?.addEventListener('click', () =>
+      operatorAction('macros', () =>
+        api('/api/macros').then((r) => ({
+          markdown: `# Macros\n${(r.macros || [])
+            .map((m) => `- **${m.name}** → \`${m.command}\``)
+            .join('\n') || '- none'}`,
+        }))
+      )
+    );
+    $('#btnChangelog')?.addEventListener('click', () =>
+      operatorAction('changelog', () =>
+        api('/api/changelog').then((r) => ({ markdown: r.markdown || JSON.stringify(r, null, 2) }))
+      )
+    );
+    $('#btnFocus')?.addEventListener('click', () =>
+      operatorAction('focus', () =>
+        api('/api/focus', { method: 'POST', body: JSON.stringify({ action: 'start', minutes: 25 }) }).then(
+          (r) => ({
+            markdown: r.ok
+              ? `Focus started: **${r.active.minutes} min** until ${r.active.endsAt}`
+              : r.error || 'Focus failed',
+          })
+        )
+      )
+    );
+    $('#btnBackup')?.addEventListener('click', () =>
+      operatorAction('backup', () =>
+        api('/api/backups', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({
+          markdown: r.ok
+            ? `Backup saved → \`${r.savedPath}\` (${r.fileCount} files)`
+            : r.error || 'Backup failed',
+        }))
+      )
+    );
+    $('#btnExportDelivery')?.addEventListener('click', () =>
+      operatorAction('export delivery', () =>
+        api('/api/delivery/export', { method: 'POST', body: JSON.stringify({}) }).then((r) => ({
+          markdown: `Saved delivery draft to \`${r.savedPath}\`\n\n${r.markdown || ''}`,
+        }))
+      )
+    );
+    $('#btnPrefs')?.addEventListener('click', () =>
+      operatorAction('preferences', () =>
+        api('/api/preferences').then((r) => ({
+          markdown: `# Preferences\n\`\`\`json\n${JSON.stringify(r.preferences, null, 2)}\n\`\`\``,
+        }))
+      )
+    );
+    $('#btnTrustedOn')?.addEventListener('click', () =>
+      operatorAction('trusted on', () =>
+        api('/api/trusted-mode', { method: 'POST', body: JSON.stringify({ enabled: true }) }).then((r) => {
+          loadStatus();
+          return { markdown: `**Trusted Operator Mode ON**\n\n${r.note || ''}` };
+        })
+      )
+    );
+    $('#btnTrustedOff')?.addEventListener('click', () =>
+      operatorAction('trusted off', () =>
+        api('/api/trusted-mode', { method: 'POST', body: JSON.stringify({ enabled: false }) }).then(() => {
+          loadStatus();
+          return { markdown: 'Trusted Operator Mode OFF — approvals required again.' };
+        })
+      )
+    );
 
     addMessage(
       'assistant',

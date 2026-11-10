@@ -1,0 +1,79 @@
+# TONY production stack for a VPS (Docker + Caddy HTTPS)
+# Usage on server:
+#   cp .env.example .env   # fill secrets
+#   docker compose -f deploy/docker-compose.prod.yml --env-file .env up -d --build
+
+services:
+  tony:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 8787
+      NODE_ENV: production
+      TONY_ENV: production
+      TONY_DATA_DIR: /app/data
+      TONY_WORKSPACE_ROOT: /app
+      TONY_LLM_PROVIDER: ${TONY_LLM_PROVIDER:-groq}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+      TONY_API_TOKEN: ${TONY_API_TOKEN:?set TONY_API_TOKEN}
+      TONY_USER_NAME: ${TONY_USER_NAME:-Operator}
+      TONY_COMPANION_MODE: ${TONY_COMPANION_MODE:-true}
+      TONY_ALWAYS_LISTEN: ${TONY_ALWAYS_LISTEN:-false}
+      TONY_TRUSTED_MODE: ${TONY_TRUSTED_MODE:-false}
+      TONY_SHELL_UNSAFE: "false"
+      TONY_MEMORIAL_VOICE: ${TONY_MEMORIAL_VOICE:-true}
+      TONY_OBSIDIAN_WATCH: ${TONY_OBSIDIAN_WATCH:-true}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_POLLING: ${TELEGRAM_POLLING:-false}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      OBSIDIAN_VAULT_PATH: /app/vault
+    volumes:
+      - tony_data:/app/data
+      - tony_vault:/app/vault
+    expose:
+      - "8787"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - tony_net
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TONY_DOMAIN: ${TONY_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      tony:
+        condition: service_healthy
+    networks:
+      - tony_net
+
+volumes:
+  tony_data:
+  tony_vault:
+  caddy_data:
+  caddy_config:
+
+networks:
+  tony_net:

@@ -387,3 +387,91 @@ dialog {
   color: var(--text);
   padding: 1.5rem;
 }
+
+.operator-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 0.5rem;
+  margin: 0.65rem 0 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  background: linear-gradient(120deg, rgba(0, 40, 70, 0.55), rgba(0, 10, 25, 0.7));
+}
+.op-cell span {
+  display: block;
+  font-family: var(--font-hud);
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.op-cell strong {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  color: var(--cyan);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.op-approvals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+.op-approvals .approval-chip {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  border: 1px solid rgba(255, 180, 0, 0.45);
+  padding: 0.25rem 0.45rem;
+  font-size: 0.72rem;
+}
+.op-approvals button {
+  font-family: var(--font-hud);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--cyan);
+  background: transparent;
+  color: var(--cyan);
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+.op-approvals button.reject {
+  border-color: #ff5577;
+  color: #ff5577;
+}
+@media (max-width: 900px) {
+  .operator-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.operator-actions {
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  padding: 0.85rem;
+  background: rgba(0, 20, 40, 0.55);
+}
+.operator-actions h3 {
+  font-family: var(--font-hud);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.65rem;
+  color: var(--cyan);
+}
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.trusted-label {
+  margin-top: 0.65rem;
+  font-family: var(--font-hud);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: #ffcc66;
+}

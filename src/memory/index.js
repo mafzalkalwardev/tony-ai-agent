@@ -4,11 +4,18 @@ const procedural = require('./procedural');
 const errors = require('./errors');
 
 function searchAll(query, limit = 10) {
+  let embeddings = [];
+  try {
+    embeddings = require('./embeddings').search(query, limit);
+  } catch {
+    embeddings = [];
+  }
   return {
     episodic: episodic.searchEpisodes(query, limit),
     semantic: semantic.search(query, limit),
     procedural: procedural.findPlaybooks(query, 5),
     errors: errors.search(query, 5),
+    embeddings,
   };
 }
 
@@ -23,4 +30,5 @@ module.exports = {
   semantic,
   procedural,
   errors,
+  embeddings: () => require('./embeddings'),
 };

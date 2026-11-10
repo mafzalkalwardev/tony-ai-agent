@@ -9,6 +9,19 @@ function env(key, fallback = '') {
   return process.env[key] ?? fallback;
 }
 
+function loadSettingsFile() {
+  const settingsPath = path.join(root, 'config', 'settings.json');
+  try {
+    if (!fs.existsSync(settingsPath)) return {};
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+const fileSettings = loadSettingsFile();
+const voiceFile = fileSettings.voice || {};
+
 module.exports = {
   port: Number(env('PORT', '8787')),
   dataDir: path.resolve(root, env('TONY_DATA_DIR', './data')),
@@ -50,11 +63,26 @@ module.exports = {
     baseUrl: env('DEEPGRAM_BASE_URL', 'https://api.deepgram.com/v1'),
   },
   voice: {
-    minConfidence: Number(env('TONY_VOICE_MIN_CONFIDENCE', '0.55')),
-    noiseCancellation: env('TONY_VOICE_NOISE_CANCEL', 'true') === 'true',
-    highPassHz: Number(env('TONY_VOICE_HIGHPASS_HZ', '180')),
-    vadSpeechMult: Number(env('TONY_VOICE_VAD_MULT', '3.2')),
+    minConfidence: Number(
+      env('TONY_VOICE_MIN_CONFIDENCE', String(voiceFile.minConfidence ?? 0.55))
+    ),
+    noiseCancellation:
+      env('TONY_VOICE_NOISE_CANCEL', String(voiceFile.noiseCancellation ?? true)) === 'true',
+    highPassHz: Number(env('TONY_VOICE_HIGHPASS_HZ', String(voiceFile.highPassHz ?? 180))),
+    vadSpeechMult: Number(env('TONY_VOICE_VAD_MULT', String(voiceFile.vadSpeechMult ?? 3.2))),
+    silenceStopSeconds: Number(
+      env('TONY_VOICE_SILENCE_STOP_SECONDS', String(voiceFile.silenceStopSeconds ?? 1.2))
+    ),
+    silenceThreshold: Number(
+      env('TONY_VOICE_SILENCE_THRESHOLD', String(voiceFile.silenceThreshold ?? 0.015))
+    ),
+    useSilenceDetection: voiceFile.useSilenceDetection !== false,
+    preferLocalStt:
+      env('TONY_VOICE_PREFER_LOCAL_STT', String(voiceFile.preferLocalStt ?? false)) === 'true',
+    preferLocalTts:
+      env('TONY_VOICE_PREFER_LOCAL_TTS', String(voiceFile.preferLocalTts ?? true)) === 'true',
   },
+  settings: fileSettings,
   elevenlabs: {
     apiKey: env('ELEVENLABS_API_KEY'),
     voiceId: env('ELEVENLABS_VOICE_ID', '21m00Tcm4TlvDq8ikWAM'),
@@ -64,6 +92,10 @@ module.exports = {
   obsidian: {
     vaultPath: env('OBSIDIAN_VAULT_PATH', path.join(root, 'vault')),
     brainFolder: env('OBSIDIAN_BRAIN_FOLDER', 'Agentic Brain'),
+    watch: env('TONY_OBSIDIAN_WATCH', 'true') === 'true',
+  },
+  prefsVault: {
+    secret: env('TONY_PREFS_SECRET', ''),
   },
   mcp: {
     perplexity: {
@@ -117,13 +149,38 @@ module.exports = {
   maxIterations: Number(env('TONY_MAX_ITERATIONS', '12')),
   autoReflect: env('TONY_AUTO_REFLECT', 'true') === 'true',
   workspaceRoot: path.resolve(root, env('TONY_WORKSPACE_ROOT', '.')),
-  apiToken: env('TONY_API_TOKEN', 'dev_tony_token'),
+  apiToken: (() => {
+    const token = env('TONY_API_TOKEN', 'dev_tony_token');
+    const isProd = env('TONY_ENV', '') === 'production' || env('NODE_ENV', '') === 'production';
+    if (isProd && (!token || token === 'dev_tony_token' || token === 'change_me_tony_gateway_token' || token === 'docker_tony_token')) {
+      console.warn('[tony] WARNING: weak/default TONY_API_TOKEN in production — set a strong token');
+    }
+    return token;
+  })(),
+  envName: env('TONY_ENV', env('NODE_ENV', 'development')),
   signalmint: {
     apiUrl: env('SIGNALMINT_API_URL', 'http://localhost:5000'),
     email: env('SIGNALMINT_EMAIL', ''),
     password: env('SIGNALMINT_PASSWORD', ''),
   },
   githubToken: env('GITHUB_TOKEN', ''),
+  telegram: {
+    botToken: env('TELEGRAM_BOT_TOKEN', ''),
+    chatId: env('TELEGRAM_CHAT_ID', ''),
+    polling: env('TELEGRAM_POLLING', 'false') === 'true',
+  },
+  discord: {
+    webhookUrl: env('DISCORD_WEBHOOK_URL', ''),
+    botToken: env('DISCORD_BOT_TOKEN', ''),
+    allowedUser: env('DISCORD_ALLOWED_USER', ''),
+  },
+  memorialVoice: {
+    enabled: env('TONY_MEMORIAL_VOICE', 'true') === 'true',
+  },
+  rateLimits: {
+    shellMax: Number(env('TONY_SHELL_RATE_MAX', '30')),
+    shellWindowMs: Number(env('TONY_SHELL_RATE_WINDOW_MS', '60000')),
+  },
   tonyDesktop: {
     path: env('TONY_DESKTOP_PATH', ''),
     enabled: env('TONY_DESKTOP_ENABLED', 'true') === 'true',
@@ -133,6 +190,13 @@ module.exports = {
     maxRetries: Number(env('TONY_SELF_HEAL_RETRIES', '1')),
   },
   shellUnsafe: env('TONY_SHELL_UNSAFE', 'false') === 'true',
+  trustedMode: {
+    enabledByDefault: env('TONY_TRUSTED_MODE', 'false') === 'true',
+  },
+  research: {
+    allowAnyHttp: env('TONY_RESEARCH_ANY_HTTP', 'true') === 'true',
+    openBrowserOnResearch: env('TONY_RESEARCH_OPEN_BROWSER', 'true') === 'true',
+  },
   companion: {
     enabled: env('TONY_COMPANION_MODE', 'true') === 'true',
     userName: env('TONY_USER_NAME', 'Muhammad Afzal'),

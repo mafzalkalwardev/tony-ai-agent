@@ -1,7 +1,7 @@
 {
   "name": "tony-agent",
-  "version": "2.7.0",
-  "description": "TONY — multi-LLM agent, JARVIS voice UI, realtime laptop automation, companion mode, self-healing, MCP, goals",
+  "version": "2.15.0",
+  "description": "TONY — trusted laptop operator with checkpoints, audit log, changelog, backups, focus timer, memorial voice, vector memory, MCP, JARVIS",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
@@ -28,6 +28,9 @@
     "mcp:stack": "node scripts/start-mcp-stack.js",
     "tony:daemon": "node src/daemon/index.js",
     "desktop": "node scripts/launch-desktop.js",
+    "deploy:vps": "bash scripts/deploy-vps.sh",
+    "prod:up": "docker compose -f deploy/docker-compose.prod.yml --env-file .env up -d --build",
+    "prod:down": "docker compose -f deploy/docker-compose.prod.yml --env-file .env down",
     "openwiki:init": "npx --yes @langchain/openwiki --init -p || echo Install openwiki CLI separately"
   },
   "engines": {

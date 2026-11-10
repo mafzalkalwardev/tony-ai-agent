@@ -501,14 +501,41 @@ const builtins = {
     },
     async execute({ command, approved = false }) {
       const { canRunCommand } = require('../safety/policy');
+      const { logCommand } = require('./runners');
+      const approvals = require('../safety/approvals');
+      const rate = require('../safety/rate_limit').check('shell');
+      if (!rate.allowed) {
+        return { ok: false, level: 'RATE_LIMITED', error: rate.error, retryAfterMs: rate.retryAfterMs };
+      }
       const check = canRunCommand(command, { approved, unsafeMode: config.shellUnsafe });
       if (!check.allowed) {
+        let pending = null;
+        if (check.level === 'NEEDS_APPROVAL') {
+          pending = approvals.create({
+            action: 'shell',
+            command,
+            reason: check.reason,
+          });
+        }
         return {
           ok: false,
           level: check.level,
           error: check.reason,
+          pendingApprovalId: pending?.id,
           hint: check.level === 'NEEDS_APPROVAL' ? 'Ask user to approve, then retry with approved:true' : undefined,
         };
+      }
+      logCommand(command, { approved, level: check.level, tool: 'shell' });
+      try {
+        require('../safety/audit').record({
+          type: 'shell_run',
+          action: 'shell',
+          detail: command,
+          level: check.level,
+          ok: true,
+        });
+      } catch {
+        /* ignore */
       }
       const out = execSync(command, {
         cwd: config.workspaceRoot,
@@ -516,7 +543,7 @@ const builtins = {
         timeout: 120000,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-      return { ok: true, level: check.level, output: out.slice(0, 8000) };
+      return { ok: true, level: check.level, output: out.slice(0, 8000), rateRemaining: rate.remaining };
     },
   },
 
@@ -537,9 +564,29 @@ const builtins = {
         return { ok: false, error: 'Writing .env requires approved:true after user consent' };
       }
       const full = safePath(filePath);
+      const nextBytes = Buffer.byteLength(content, 'utf8');
+      const LARGE_OVERWRITE = 200 * 1024; // 200 KB
+      if (fs.existsSync(full)) {
+        const currentBytes = fs.statSync(full).size;
+        if (currentBytes >= LARGE_OVERWRITE && !approved) {
+          const approvals = require('../safety/approvals');
+          const pending = approvals.create({
+            action: 'overwrite_large_file',
+            command: `write_file ${filePath}`,
+            reason: `Overwriting large file (${currentBytes} bytes) requires approval`,
+          });
+          return {
+            ok: false,
+            level: 'NEEDS_APPROVAL',
+            needsApproval: true,
+            pendingApprovalId: pending.id,
+            error: `Large file overwrite blocked until approved (${currentBytes} bytes).`,
+          };
+        }
+      }
       fs.mkdirSync(path.dirname(full), { recursive: true });
       fs.writeFileSync(full, content, 'utf8');
-      return { ok: true, path: filePath, bytes: Buffer.byteLength(content, 'utf8') };
+      return { ok: true, path: filePath, bytes: nextBytes };
     },
   },
 
@@ -794,26 +841,63 @@ const builtins = {
   desktop_automate: {
     name: 'desktop_automate',
     description:
-      'Windows desktop automation via pyautogui — click, type, hotkey, screenshot, move mouse. Use for realtime laptop tasks, opening apps, form filling on native UI.',
+      'Full laptop control via pyautogui — click, doubleclick, type, press, hotkey, scroll, drag, move, screenshot, multi-step sequence. Use for realtime desktop takeover.',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['click', 'type', 'hotkey', 'screenshot', 'move', 'position'],
+          enum: [
+            'click',
+            'doubleclick',
+            'type',
+            'press',
+            'hotkey',
+            'screenshot',
+            'move',
+            'position',
+            'scroll',
+            'drag',
+            'sequence',
+          ],
         },
         x: { type: 'number' },
         y: { type: 'number' },
+        x2: { type: 'number' },
+        y2: { type: 'number' },
         text: { type: 'string' },
+        key: { type: 'string' },
         keys: { type: 'array', items: { type: 'string' } },
+        clicks: { type: 'number' },
         duration: { type: 'number' },
+        steps: { type: 'array', items: { type: 'object' } },
+        approved: { type: 'boolean' },
       },
       required: ['action'],
     },
     async execute(payload) {
       const automation = require('../bridge/automation');
-      if (!require('../config').automation?.enabled) {
+      const cfg = require('../config');
+      if (!cfg.automation?.enabled) {
         return { ok: false, error: 'Desktop automation disabled — set TONY_AUTOMATION_ENABLED=true' };
+      }
+      const trusted = require('../safety/trusted_mode');
+      if (
+        !payload.approved &&
+        !trusted.canAutoApprove('desktop_automate', payload.action) &&
+        ['click', 'type', 'hotkey', 'press', 'drag', 'sequence'].includes(payload.action)
+      ) {
+        const pending = require('../safety/approvals').create({
+          action: 'desktop_automate',
+          command: payload.action,
+          reason: 'Desktop control requires approval or Trusted Operator Mode',
+        });
+        return {
+          ok: false,
+          needsApproval: true,
+          pendingApprovalId: pending.id,
+          error: 'Approve desktop control or say: Tony trusted mode on',
+        };
       }
       return automation.run(payload);
     },
@@ -1036,6 +1120,990 @@ builtins.signalmint_conversations = {
   async execute() {
     const data = await signalmintApi('/api/conversations');
     return { ok: true, conversations: data };
+  },
+};
+
+builtins.project_scan = {
+  name: 'project_scan',
+  description: 'Scan the workspace: file tree, package.json/requirements, README, tests folder, detected test/build commands',
+  parameters: {
+    type: 'object',
+    properties: { path: { type: 'string', description: 'Relative project path', default: '.' } },
+  },
+  async execute({ path: projectPath = '.' } = {}) {
+    const scanner = require('./project_scanner');
+    const result = scanner.scan(projectPath);
+    return { ok: true, ...result, text: scanner.scanAsText(projectPath) };
+  },
+};
+
+builtins.run_tests = {
+  name: 'run_tests',
+  description: 'Run detected project tests (npm test / pytest). Requires approval unless already approved.',
+  parameters: {
+    type: 'object',
+    properties: {
+      approved: { type: 'boolean' },
+      path: { type: 'string', default: '.' },
+    },
+  },
+  async execute({ approved = false, path: projectPath = '.' } = {}) {
+    return require('./runners').runTests({ approved, projectPath });
+  },
+};
+
+builtins.build_project = {
+  name: 'build_project',
+  description: 'Run detected safe build command (e.g. npm run build). Always needs approval.',
+  parameters: {
+    type: 'object',
+    properties: {
+      approved: { type: 'boolean' },
+      path: { type: 'string', default: '.' },
+    },
+  },
+  async execute({ approved = false, path: projectPath = '.' } = {}) {
+    return require('./runners').runBuild({ approved, projectPath });
+  },
+};
+
+builtins.client_delivery = {
+  name: 'client_delivery',
+  description:
+    'Prepare a professional client delivery package (summary, setup, testing checklist, message draft). Does NOT send messages.',
+  parameters: {
+    type: 'object',
+    properties: {
+      completedWork: { type: 'string' },
+      limitations: { type: 'string' },
+      path: { type: 'string', default: '.' },
+    },
+  },
+  async execute({ completedWork = '', limitations = '', path: projectPath = '.' } = {}) {
+    return require('./delivery_helper').prepareDeliveryPackage({
+      projectPath,
+      completedWork,
+      limitations,
+    });
+  },
+};
+
+builtins.intent_route = {
+  name: 'intent_route',
+  description: 'Classify a user command into TONY intent categories (Roman Urdu / English / Hindi supported)',
+  parameters: {
+    type: 'object',
+    properties: { message: { type: 'string' } },
+    required: ['message'],
+  },
+  async execute({ message }) {
+    const routed = require('../core/intent_router').route(message);
+    return { ok: true, ...routed };
+  },
+};
+
+builtins.clipboard = {
+  name: 'clipboard',
+  description:
+    'Read or write clipboard text for copy/paste commands (Roman Urdu: "Tony ye copy karo"). Uses OS clipboard when available.',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'Text to copy; omit to read clipboard' },
+      mode: { type: 'string', enum: ['auto', 'read', 'write'], default: 'auto' },
+    },
+  },
+  async execute({ text = '', mode = 'auto' } = {}) {
+    return require('./clipboard_tool').copyPaste({ text, mode });
+  },
+};
+
+builtins.search_web = {
+  name: 'search_web',
+  description: 'Search the web (opens DuckDuckGo). Use for "browser mein search karo …"',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      open: { type: 'boolean', default: true },
+      approved: { type: 'boolean' },
+    },
+    required: ['query'],
+  },
+  async execute({ query, open = true, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('search_web', query)) {
+      const pending = require('../safety/approvals').create({
+        action: 'search_web',
+        command: query,
+        reason: 'Opening external browser search requires approval',
+      });
+      return {
+        ok: false,
+        level: 'NEEDS_APPROVAL',
+        needsApproval: true,
+        pendingApprovalId: pending.id,
+        error: 'Approve browser search first (yes/haan), or enable Trusted Operator Mode.',
+        previewUrl: require('./web_search').buildSearchUrl(query),
+      };
+    }
+    return require('./web_search').searchWeb(query, { open });
+  },
+};
+
+builtins.open_app = {
+  name: 'open_app',
+  description: 'Open a common local app (vscode, terminal, chrome, browser, notepad, explorer, calculator)',
+  parameters: {
+    type: 'object',
+    properties: { app: { type: 'string' } },
+    required: ['app'],
+  },
+  async execute({ app }) {
+    return require('./open_app').openApp(app);
+  },
+};
+
+builtins.summarize_repo = {
+  name: 'summarize_repo',
+  description: 'Summarize local git repository state (branch, status, recent commits). Safe/read-only.',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./github_helper').summarizeRepo();
+  },
+};
+
+builtins.explain_changes = {
+  name: 'explain_changes',
+  description: 'Explain changed/untracked files before commit or PR',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./github_helper').explainChangedFiles();
+  },
+};
+
+builtins.commit_message = {
+  name: 'commit_message',
+  description: 'Draft a commit message from local changes (does not commit)',
+  parameters: {
+    type: 'object',
+    properties: { topic: { type: 'string' } },
+  },
+  async execute({ topic = '' } = {}) {
+    return require('./github_helper').generateCommitMessage(topic);
+  },
+};
+
+builtins.prepare_pr = {
+  name: 'prepare_pr',
+  description: 'Prepare push/PR instructions and checklist (does not push)',
+  parameters: {
+    type: 'object',
+    properties: { topic: { type: 'string' } },
+  },
+  async execute({ topic = '' } = {}) {
+    return require('./github_helper').preparePrInstructions(topic);
+  },
+};
+
+builtins.preferences_get = {
+  name: 'preferences_get',
+  description: 'Read local operator preferences (no secrets)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, preferences: require('./preferences').load() };
+  },
+};
+
+builtins.preferences_update = {
+  name: 'preferences_update',
+  description: 'Update local operator preferences (rejects secret-like values)',
+  parameters: {
+    type: 'object',
+    properties: {
+      userName: { type: 'string' },
+      language: { type: 'string' },
+      projectNote: { type: 'string' },
+      alwaysAllowNpmTest: { type: 'boolean' },
+    },
+  },
+  async execute(args = {}) {
+    const prefs = require('./preferences');
+    if (args.projectNote) return { ok: true, preferences: prefs.addProjectNote(args.projectNote) };
+    const patch = {};
+    if (args.userName) patch.userName = args.userName;
+    if (args.language) patch.language = args.language;
+    if (typeof args.alwaysAllowNpmTest === 'boolean') {
+      patch.safety = { alwaysAllowNpmTest: args.alwaysAllowNpmTest };
+    }
+    return { ok: true, preferences: prefs.save(patch) };
+  },
+};
+
+builtins.export_delivery = {
+  name: 'export_delivery',
+  description: 'Generate and save a client delivery markdown file under data/reports (does not send)',
+  parameters: {
+    type: 'object',
+    properties: {
+      completedWork: { type: 'string' },
+      limitations: { type: 'string' },
+    },
+  },
+  async execute({ completedWork = '', limitations = '' } = {}) {
+    const pack = require('./delivery_helper').prepareDeliveryPackage({
+      projectPath: '.',
+      completedWork,
+      limitations,
+    });
+    const outDir = path.join(config.dataDir, 'reports');
+    fs.mkdirSync(outDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const file = path.join(outDir, `delivery_${stamp}.md`);
+    fs.writeFileSync(file, pack.markdown, 'utf8');
+    return { ...pack, savedPath: path.relative(config.workspaceRoot, file) };
+  },
+};
+
+builtins.local_stt_status = {
+  name: 'local_stt_status',
+  description: 'Show optional faster-whisper local STT bridge status',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../voice/local_stt').status() };
+  },
+};
+
+builtins.trusted_mode = {
+  name: 'trusted_mode',
+  description:
+    'Enable/disable Trusted Operator Mode. When ON, TONY auto-approves research, desktop control, installs, builds, git write — hard blocks (secrets/rm -rf/payments/deceptive deepfakes) remain. Memorial voice still needs consent.',
+  parameters: {
+    type: 'object',
+    properties: {
+      enabled: { type: 'boolean' },
+      action: { type: 'string', enum: ['status', 'on', 'off'] },
+    },
+  },
+  async execute({ enabled, action = 'status' } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (action === 'on' || enabled === true) return { ok: true, ...trusted.enable({ by: 'tool' }) };
+    if (action === 'off' || enabled === false) return { ok: true, ...trusted.disable() };
+    return { ok: true, ...trusted.status() };
+  },
+};
+
+builtins.research_web = {
+  name: 'research_web',
+  description:
+    'Full-web research on any topic: multi-engine links + fetch public pages. Can open browser. Use for deep research across any websites.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      urls: { type: 'array', items: { type: 'string' } },
+      openBrowser: { type: 'boolean' },
+    },
+    required: ['query'],
+  },
+  async execute({ query, urls = [], openBrowser } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    const cfg = require('../config');
+    const open = openBrowser ?? (trusted.isEnabled() || cfg.research?.openBrowserOnResearch);
+    if (!trusted.canAutoApprove('research_web', query) && !trusted.isEnabled()) {
+      const pending = require('../safety/approvals').create({
+        action: 'research_web',
+        command: query,
+        reason: 'Broad web research/browser open — approve or enable trusted mode',
+      });
+      return {
+        ok: false,
+        needsApproval: true,
+        pendingApprovalId: pending.id,
+        preview: require('./web_search').buildSearchUrl(query),
+        error: 'Approve research or say: Tony trusted mode on',
+      };
+    }
+    return require('./research_web').researchTopic(query, { openBrowser: open, urls });
+  },
+};
+
+builtins.browse_site = {
+  name: 'browse_site',
+  description: 'Open and/or fetch ANY public http(s) website for research',
+  parameters: {
+    type: 'object',
+    properties: {
+      url: { type: 'string' },
+      open: { type: 'boolean', default: true },
+      approved: { type: 'boolean' },
+    },
+    required: ['url'],
+  },
+  async execute({ url, open = true, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('browse_site', url)) {
+      const pending = require('../safety/approvals').create({
+        action: 'browse_site',
+        command: url,
+        reason: 'Opening external site requires approval or trusted mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('./research_web').browseSite(url, { open });
+  },
+};
+
+builtins.decide_action = {
+  name: 'decide_action',
+  description:
+    'Analyze a big/risky decision. In Trusted Mode, recommends and authorizes proceeding. Otherwise creates approval.',
+  parameters: {
+    type: 'object',
+    properties: {
+      message: { type: 'string' },
+      intent: { type: 'string' },
+    },
+    required: ['message'],
+  },
+  async execute({ message, intent = 'unknown' }, sessionId) {
+    const engine = require('../core/decision_engine');
+    return engine.decideAndMaybeExecute({
+      message,
+      intent: { intent },
+      sessionId,
+    });
+  },
+};
+
+builtins.laptop_control = {
+  name: 'laptop_control',
+  description:
+    'High-level laptop takeover helper: screenshot, open app, type text, hotkey chord, or run a step sequence.',
+  parameters: {
+    type: 'object',
+    properties: {
+      goal: { type: 'string' },
+      steps: { type: 'array', items: { type: 'object' } },
+      approved: { type: 'boolean' },
+    },
+    required: ['goal'],
+  },
+  async execute({ goal, steps = [], approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('laptop_control', goal)) {
+      const pending = require('../safety/approvals').create({
+        action: 'laptop_control',
+        command: goal,
+        reason: 'Laptop takeover requires approval or Trusted Operator Mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    const automation = require('../bridge/automation');
+    if (!steps.length) {
+      const shot = automation.run({ action: 'screenshot' });
+      return {
+        ok: true,
+        goal,
+        note: 'No steps provided — captured screenshot. Provide steps for click/type/hotkey sequence.',
+        screenshot: shot,
+      };
+    }
+    return automation.run({ action: 'sequence', steps });
+  },
+};
+
+builtins.browser_operator = {
+  name: 'browser_operator',
+  description:
+    'Always-on browser operator via Playwright MCP — navigate, snapshot, click, type on any public site. Start with npm run playwright:mcp.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['status', 'navigate', 'snapshot', 'click', 'type', 'research'],
+      },
+      url: { type: 'string' },
+      ref: { type: 'string' },
+      text: { type: 'string' },
+      approved: { type: 'boolean' },
+    },
+    required: ['action'],
+  },
+  async execute({ action, url, ref, text, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    const op = require('./browser_operator');
+    if (action === 'status') return { ok: true, ...op.status(), ready: await op.ensureReady() };
+    if (!approved && !trusted.canAutoApprove('browser_operator', action)) {
+      const pending = require('../safety/approvals').create({
+        action: 'browser_operator',
+        command: `${action} ${url || ref || ''}`.trim(),
+        reason: 'Browser operator requires approval or Trusted Mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    if (action === 'navigate') return op.navigate(url);
+    if (action === 'snapshot') return op.snapshot(url);
+    if (action === 'click') return op.click(ref);
+    if (action === 'type') return op.type(ref, text);
+    if (action === 'research') return op.researchAndSnapshot(url);
+    return { ok: false, error: `Unknown action: ${action}` };
+  },
+};
+
+builtins.create_issue = {
+  name: 'create_issue',
+  description: 'Create a GitHub issue via gh CLI (requires approval or Trusted Mode)',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      body: { type: 'string' },
+      approved: { type: 'boolean' },
+    },
+    required: ['title'],
+  },
+  async execute({ title, body = '', approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('create_issue', title)) {
+      const pending = require('../safety/approvals').create({
+        action: 'create_issue',
+        command: title,
+        reason: 'Creating GitHub issues requires approval or Trusted Mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('./github_helper').createIssue({ title, body });
+  },
+};
+
+builtins.create_pr = {
+  name: 'create_pr',
+  description: 'Create a GitHub pull request via gh CLI (requires approval or Trusted Mode)',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      body: { type: 'string' },
+      base: { type: 'string', default: 'master' },
+      draft: { type: 'boolean' },
+      approved: { type: 'boolean' },
+    },
+  },
+  async execute({ title, body = '', base = 'master', draft = false, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    if (!approved && !trusted.canAutoApprove('create_pr', title || 'pr')) {
+      const pending = require('../safety/approvals').create({
+        action: 'create_pr',
+        command: title || 'create pr',
+        reason: 'Creating GitHub PRs requires approval or Trusted Mode',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('./github_helper').createPullRequest({ title, body, base, draft });
+  },
+};
+
+builtins.telegram_status = {
+  name: 'telegram_status',
+  description: 'Show Telegram remote channel status',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../channels/telegram').status() };
+  },
+};
+
+builtins.telegram_send = {
+  name: 'telegram_send',
+  description: 'Send a message to the configured Telegram chat (approval/trusted for outbound)',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      approved: { type: 'boolean' },
+    },
+    required: ['text'],
+  },
+  async execute({ text, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    const rate = require('../safety/rate_limit').check('telegram_send');
+    if (!rate.allowed) return { ok: false, error: rate.error, retryAfterMs: rate.retryAfterMs };
+    if (!approved && !trusted.canAutoApprove('send_message', text)) {
+      const pending = require('../safety/approvals').create({
+        action: 'telegram_send',
+        command: text.slice(0, 120),
+        reason: 'Outbound Telegram message requires approval',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('../channels/telegram').sendMessage(text);
+  },
+};
+
+builtins.discord_status = {
+  name: 'discord_status',
+  description: 'Show Discord remote channel status',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../channels/discord').status() };
+  },
+};
+
+builtins.discord_send = {
+  name: 'discord_send',
+  description: 'Send a message via Discord webhook (approval/trusted for outbound)',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      approved: { type: 'boolean' },
+    },
+    required: ['text'],
+  },
+  async execute({ text, approved = false } = {}) {
+    const trusted = require('../safety/trusted_mode');
+    const rate = require('../safety/rate_limit').check('discord_send');
+    if (!rate.allowed) return { ok: false, error: rate.error, retryAfterMs: rate.retryAfterMs };
+    if (!approved && !trusted.canAutoApprove('send_message', text)) {
+      const pending = require('../safety/approvals').create({
+        action: 'discord_send',
+        command: text.slice(0, 120),
+        reason: 'Outbound Discord message requires approval',
+      });
+      return { ok: false, needsApproval: true, pendingApprovalId: pending.id, error: pending.reason };
+    }
+    return require('../channels/discord').sendMessage(text);
+  },
+};
+
+builtins.workspace_list = {
+  name: 'workspace_list',
+  description: 'List registered multi-repo workspaces and the active root',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./workspaces').list();
+  },
+};
+
+builtins.workspace_add = {
+  name: 'workspace_add',
+  description: 'Register another local repo path as a TONY workspace',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      path: { type: 'string' },
+    },
+    required: ['name', 'path'],
+  },
+  async execute({ name, path: repoPath }) {
+    return require('./workspaces').addWorkspace({ name, path: repoPath });
+  },
+};
+
+builtins.workspace_switch = {
+  name: 'workspace_switch',
+  description: 'Switch TONY active workspace root by id or name',
+  parameters: {
+    type: 'object',
+    properties: { id: { type: 'string' } },
+    required: ['id'],
+  },
+  async execute({ id }) {
+    return require('./workspaces').switchWorkspace(id);
+  },
+};
+
+builtins.reminder_add = {
+  name: 'reminder_add',
+  description: 'Create a local reminder (minutesFromNow or dueAt ISO)',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      minutesFromNow: { type: 'number' },
+      dueAt: { type: 'string' },
+    },
+    required: ['text'],
+  },
+  async execute(args = {}) {
+    return require('./reminders').addReminder(args);
+  },
+};
+
+builtins.reminder_list = {
+  name: 'reminder_list',
+  description: 'List open local reminders',
+  parameters: { type: 'object', properties: { includeDone: { type: 'boolean' } } },
+  async execute({ includeDone = false } = {}) {
+    return { ok: true, reminders: require('./reminders').list({ includeDone }) };
+  },
+};
+
+builtins.reminder_complete = {
+  name: 'reminder_complete',
+  description: 'Mark a reminder done by id',
+  parameters: {
+    type: 'object',
+    properties: { id: { type: 'string' } },
+    required: ['id'],
+  },
+  async execute({ id }) {
+    return require('./reminders').completeReminder(id);
+  },
+};
+
+builtins.daily_briefing = {
+  name: 'daily_briefing',
+  description: 'Generate morning/afternoon operator briefing (repo + reminders + trusted mode)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./reminders').dailyBriefing();
+  },
+};
+
+builtins.vault_watch_status = {
+  name: 'vault_watch_status',
+  description: 'Show Obsidian vault live-watcher status and recent note events',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../brain/vault_watcher').status() };
+  },
+};
+
+builtins.vault_watch_start = {
+  name: 'vault_watch_start',
+  description: 'Start live Obsidian vault watcher',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('../brain/vault_watcher').start();
+  },
+};
+
+builtins.vault_sync_index = {
+  name: 'vault_sync_index',
+  description: 'Write vault watch log + refresh agentic brain index snapshot',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('../brain/vault_watcher').syncIndex();
+  },
+};
+
+builtins.prefs_vault_seal = {
+  name: 'prefs_vault_seal',
+  description: 'Seal live preferences into encrypted vault (requires TONY_PREFS_SECRET)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./pref_vault').sealFromLivePrefs();
+  },
+};
+
+builtins.prefs_vault_open = {
+  name: 'prefs_vault_open',
+  description: 'Open encrypted preference vault and restore into live prefs',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./pref_vault').restoreIntoLivePrefs();
+  },
+};
+
+builtins.generate_skill = {
+  name: 'generate_skill',
+  description: 'Draft a SKILL.md from successful procedural playbooks (optionally write to skills/)',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      query: { type: 'string' },
+      write: { type: 'boolean' },
+    },
+  },
+  async execute({ name, query, write = false } = {}) {
+    return require('../skills/generate').draftFromPlaybooks({ name, query, write });
+  },
+};
+
+builtins.tony_mcp_status = {
+  name: 'tony_mcp_status',
+  description: 'Show TONY MCP tool-server status for Cursor integration',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return { ok: true, ...require('../mcp/tony-server').status() };
+  },
+};
+
+builtins.memory_reindex = {
+  name: 'memory_reindex',
+  description: 'Rebuild local vector embeddings index from semantic facts',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('../memory/semantic').reindexAll();
+  },
+};
+
+builtins.memory_vector_search = {
+  name: 'memory_vector_search',
+  description: 'Semantic vector search over local embeddings index',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      limit: { type: 'number' },
+    },
+    required: ['query'],
+  },
+  async execute({ query, limit = 8 }) {
+    return { ok: true, hits: require('../memory/embeddings').search(query, limit) };
+  },
+};
+
+builtins.client_list = {
+  name: 'client_list',
+  description: 'List tracked clients/contacts (local JSON, no secrets)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./clients').list();
+  },
+};
+
+builtins.client_upsert = {
+  name: 'client_upsert',
+  description: 'Add/update a client record with optional note',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      company: { type: 'string' },
+      notes: { type: 'string' },
+      status: { type: 'string' },
+    },
+    required: ['name'],
+  },
+  async execute(args = {}) {
+    return require('./clients').upsertClient(args);
+  },
+};
+
+builtins.macro_list = {
+  name: 'macro_list',
+  description: 'List saved operator macros/shortcuts',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./macros').list();
+  },
+};
+
+builtins.macro_save = {
+  name: 'macro_save',
+  description: 'Save an operator macro shortcut (name → command text)',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      command: { type: 'string' },
+    },
+    required: ['name', 'command'],
+  },
+  async execute({ name, command }) {
+    return require('./macros').saveMacro({ name, command });
+  },
+};
+
+builtins.export_session = {
+  name: 'export_session',
+  description: 'Export a chat session transcript to data/reports',
+  parameters: {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      limit: { type: 'number' },
+    },
+    required: ['sessionId'],
+  },
+  async execute({ sessionId, limit = 100 }) {
+    return require('./session_export').exportSession(sessionId, { limit });
+  },
+};
+
+builtins.checkpoint_save = {
+  name: 'checkpoint_save',
+  description: 'Save a LangGraph-style session checkpoint',
+  parameters: {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      label: { type: 'string' },
+      note: { type: 'string' },
+    },
+    required: ['sessionId'],
+  },
+  async execute({ sessionId, label, note }) {
+    return require('../core/checkpoints').saveCheckpoint(sessionId, { label, note });
+  },
+};
+
+builtins.checkpoint_list = {
+  name: 'checkpoint_list',
+  description: 'List saved session checkpoints',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('../core/checkpoints').listCheckpoints();
+  },
+};
+
+builtins.checkpoint_restore = {
+  name: 'checkpoint_restore',
+  description: 'Restore a session checkpoint back into episodic memory',
+  parameters: {
+    type: 'object',
+    properties: { sessionId: { type: 'string' } },
+    required: ['sessionId'],
+  },
+  async execute({ sessionId }) {
+    return require('../core/checkpoints').restoreCheckpoint(sessionId);
+  },
+};
+
+builtins.audit_recent = {
+  name: 'audit_recent',
+  description: 'Show recent operator audit log entries',
+  parameters: {
+    type: 'object',
+    properties: { limit: { type: 'number' } },
+  },
+  async execute({ limit = 30 } = {}) {
+    return { ok: true, entries: require('../safety/audit').recent(limit) };
+  },
+};
+
+builtins.changelog_digest = {
+  name: 'changelog_digest',
+  description: 'Generate a changelog digest from git history',
+  parameters: {
+    type: 'object',
+    properties: {
+      since: { type: 'string' },
+      export: { type: 'boolean' },
+    },
+  },
+  async execute({ since = '7 days ago', export: doExport = false } = {}) {
+    const changelog = require('./changelog');
+    return doExport ? changelog.exportDigest({ since }) : changelog.digest({ since });
+  },
+};
+
+builtins.backup_data = {
+  name: 'backup_data',
+  description: 'Create a tar backup of TONY dataDir (skips secret-like files)',
+  parameters: {
+    type: 'object',
+    properties: { label: { type: 'string' } },
+  },
+  async execute({ label = 'tony-data' } = {}) {
+    return require('./backup').createBackup({ label });
+  },
+};
+
+builtins.focus_start = {
+  name: 'focus_start',
+  description: 'Start a focus/pomodoro timer',
+  parameters: {
+    type: 'object',
+    properties: {
+      minutes: { type: 'number' },
+      label: { type: 'string' },
+    },
+  },
+  async execute({ minutes = 25, label = 'Focus' } = {}) {
+    return require('./focus_timer').start({ minutes, label });
+  },
+};
+
+builtins.focus_status = {
+  name: 'focus_status',
+  description: 'Show active focus timer status',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    return require('./focus_timer').status();
+  },
+};
+
+builtins.focus_stop = {
+  name: 'focus_stop',
+  description: 'Stop the active focus timer',
+  parameters: {
+    type: 'object',
+    properties: { complete: { type: 'boolean' } },
+  },
+  async execute({ complete = false } = {}) {
+    return require('./focus_timer').stop({ complete });
+  },
+};
+
+builtins.memorial_voice_register = {
+  name: 'memorial_voice_register',
+  description:
+    'Register a MEMORIAL voice for a loved one (often deceased) with explicit consent. Requires consent phrase, rights affirmation, personal-use-only, and local audio samples. Not for scams or deceiving third parties.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      relationship: { type: 'string' },
+      personStatus: { type: 'string', enum: ['deceased', 'living'] },
+      samplePaths: { type: 'array', items: { type: 'string' } },
+      hasRights: { type: 'boolean' },
+      personalMemorialOnly: { type: 'boolean' },
+      notForDeception: { type: 'boolean' },
+      livingPermission: { type: 'boolean' },
+      consentText: { type: 'string', description: 'Must include: I consent to memorial voice for <Name>' },
+    },
+    required: ['name', 'relationship', 'samplePaths', 'consentText'],
+  },
+  async execute(args = {}) {
+    if (!require('../config').memorialVoice?.enabled) {
+      return { ok: false, error: 'Memorial voice disabled in config' };
+    }
+    return require('../voice/memorial_voice').registerMemorialVoice(args);
+  },
+};
+
+builtins.memorial_voice_clone = {
+  name: 'memorial_voice_clone',
+  description: 'Create ElevenLabs Instant Voice Clone for a consented memorial voice profile',
+  parameters: {
+    type: 'object',
+    properties: { name: { type: 'string' } },
+    required: ['name'],
+  },
+  async execute({ name }) {
+    return require('../voice/memorial_voice').cloneMemorialVoice(name);
+  },
+};
+
+builtins.memorial_voice_speak = {
+  name: 'memorial_voice_speak',
+  description: 'Speak text using a consented memorial voice (always labeled as synthetic remembrance)',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      text: { type: 'string' },
+    },
+    required: ['name', 'text'],
+  },
+  async execute({ name, text }) {
+    return require('../voice/memorial_voice').speakMemorial(name, text);
+  },
+};
+
+builtins.memorial_voice_list = {
+  name: 'memorial_voice_list',
+  description: 'List consented memorial voices (no raw audio paths exposed beyond counts)',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    const memorial = require('../voice/memorial_voice');
+    return { ok: true, voices: memorial.listVoices(), status: memorial.status() };
   },
 };
 

@@ -73,8 +73,78 @@ def main():
             size = pyautogui.size()
             print(json.dumps({"ok": True, "x": pos.x, "y": pos.y, "screenWidth": size.width, "screenHeight": size.height}))
 
+        elif action == "scroll":
+            clicks = int(payload.get("clicks", payload.get("amount", -3)))
+            x, y = payload.get("x"), payload.get("y")
+            if x is not None and y is not None:
+                pyautogui.scroll(clicks, x=x, y=y)
+            else:
+                pyautogui.scroll(clicks)
+            print(json.dumps({"ok": True, "action": "scroll", "clicks": clicks}))
+
+        elif action == "drag":
+            pyautogui.moveTo(payload.get("x", 0), payload.get("y", 0))
+            pyautogui.dragTo(
+                payload.get("x2", 0),
+                payload.get("y2", 0),
+                duration=payload.get("duration", 0.35),
+                button=payload.get("button", "left"),
+            )
+            print(json.dumps({"ok": True, "action": "drag"}))
+
+        elif action == "doubleclick":
+            x, y = payload.get("x"), payload.get("y")
+            if x is not None and y is not None:
+                pyautogui.doubleClick(x, y)
+            else:
+                pyautogui.doubleClick()
+            print(json.dumps({"ok": True, "action": "doubleclick", "x": x, "y": y}))
+
+        elif action == "press":
+            key = payload.get("key") or (payload.get("keys") or ["enter"])[0]
+            pyautogui.press(key)
+            print(json.dumps({"ok": True, "action": "press", "key": key}))
+
+        elif action == "sequence":
+            import time
+            steps = payload.get("steps") or []
+            results = []
+            for step in steps[:40]:
+                step_action = step.get("action")
+                if not step_action:
+                    continue
+                if step_action == "click":
+                    if step.get("x") is not None:
+                        pyautogui.click(step.get("x"), step.get("y"))
+                    else:
+                        pyautogui.click()
+                elif step_action == "type":
+                    text = step.get("text", "")
+                    if text.isascii():
+                        pyautogui.write(text, interval=step.get("interval", 0.02))
+                    else:
+                        _type_unicode(text)
+                elif step_action == "hotkey":
+                    pyautogui.hotkey(*(step.get("keys") or []))
+                elif step_action == "press":
+                    pyautogui.press(step.get("key", "enter"))
+                elif step_action == "scroll":
+                    pyautogui.scroll(int(step.get("clicks", -3)))
+                elif step_action == "move":
+                    pyautogui.moveTo(step.get("x", 0), step.get("y", 0), duration=step.get("duration", 0.2))
+                elif step_action == "wait":
+                    time.sleep(float(step.get("seconds", 0.5)))
+                else:
+                    results.append({"ok": False, "action": step_action, "error": "unsupported in sequence"})
+                    continue
+                results.append({"ok": True, "action": step_action})
+            print(json.dumps({"ok": True, "action": "sequence", "steps": len(results), "results": results}))
+
         else:
-            print(json.dumps({"ok": False, "error": f"Unknown action: {action}. Use: click, type, hotkey, screenshot, move, position"}))
+            print(json.dumps({
+                "ok": False,
+                "error": "Unknown action. Use: click, type, hotkey, screenshot, move, position, scroll, drag, doubleclick, press, sequence",
+            }))
             sys.exit(1)
     except Exception as e:
         print(json.dumps({"ok": False, "error": str(e)[:500]}))

@@ -34,12 +34,48 @@
 ```powershell
 Set-Location "D:\TONY AI AGENT"
 Copy-Item .env.example .env
-# Add GROQ_API_KEY (or use Ollama/Jan offline), DEEPGRAM_API_KEY, ELEVENLABS_API_KEY
+# Add GROQ_API_KEY (or use Ollama/Jan offline). Voice keys optional — local TTS preferred.
 npm install
 npm test
 npm run charlie      # Boot graph + gateway locally
 npm run chat         # Interactive CLI
+npm run desktop      # JARVIS HUD
 ```
+
+### Operator commands (English + Roman Urdu)
+
+```text
+Tony repo check karo
+Tony repo summarize karo
+Tony explain changed files
+Tony commit message banao
+Tony prepare pr
+Tony test run karo
+Tony project scan karo
+Tony client ke liye message banao
+Tony browser mein search karo groq models
+Tony VS Code kholo
+Tony mujhe status batao
+Tony project note: client wants dark mode
+```
+
+Intent categories: `chat`, `open_app`, `search_web`, `copy_paste`, `file_task`, `github_task`, `project_scan`, `run_tests`, `build_project`, `client_delivery`, `settings`, `unknown`.
+
+JARVIS Systems panel also has one-click: Repo summary · Explain changes · Commit message · Prepare PR · Export delivery · Preferences.
+
+### Trusted Operator Mode (full laptop + web research)
+
+```text
+Tony trusted mode on
+```
+
+When ON, TONY auto-approves research on any public site, desktop/laptop control, installs, builds/tests, and git write actions — and will take big operator decisions for you.
+
+Hard blocks always remain: secrets/`.env`, `rm -rf`, payments/checkout, voice cloning.
+
+Turn off anytime: `Tony trusted mode off` (also buttons in JARVIS Systems).
+
+Without trusted mode, risky actions still need **yes/haan** approval. See [TODO.md](TODO.md).
 
 ### Optional Python (desktop automation)
 
@@ -148,6 +184,25 @@ npm run mcp:stack            # Playwright + optional MCP servers
 **SignalMint** — SMS campaigns, contacts, compliance (`SIGNALMINT_*` env vars).
 
 **CodeGraph** — Structural code intelligence (`codegraph_*` tools, `npm run codegraph:index`).
+
+### Laptop operator (intent + safety)
+
+TONY classifies mixed English / Roman Urdu / Hindi commands, then runs safe tools locally or queues approval:
+
+| Example | Category |
+|---------|----------|
+| `Tony repo check karo` | `github_task` |
+| `Tony test run karo` | `run_tests` (approval) |
+| `Tony project scan karo` | `project_scan` |
+| `Tony build project karo` | `build_project` (approval) |
+| `Tony client ke liye message banao` | `client_delivery` (draft only) |
+| `Tony browser mein search karo` | `search_web` (approval) |
+| `Tony ye copy karo` | `copy_paste` |
+| `Tony mujhe status batao` | `github_task` |
+
+Tools: `intent_route`, `project_scan`, `run_tests`, `build_project`, `client_delivery`, `clipboard`.  
+APIs: `/api/intent/route`, `/api/project/scan`, `/api/delivery/prepare`, `/api/approvals`, `/api/operator/status`.  
+Voice silence thresholds live in `config/settings.json` (override with `TONY_VOICE_SILENCE_*`). See `TODO.md`.
 
 ### Desktop bridges
 
@@ -261,7 +316,13 @@ See `TONY.md` for persona, operating loop, and identity.
 ## Docker
 
 ```bash
+# local/dev
 docker compose up -d
+
+# VPS production (Caddy HTTPS) — see DEPLOY.md
+cp .env.example .env   # set TONY_API_TOKEN, GROQ_API_KEY, TONY_DOMAIN
+npm run prod:up
+# or from laptop: VPS_HOST=... VPS_USER=root npm run deploy:vps
 ```
 
 ## GitHub

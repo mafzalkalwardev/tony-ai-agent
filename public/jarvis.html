@@ -53,6 +53,13 @@
           </div>
           <button type="button" class="hud-speaker active" id="speakerBtn" title="Voice output">🔊</button>
         </div>
+        <div class="operator-strip" id="operatorStrip">
+          <div class="op-cell"><span>STATUS</span><strong id="opStatus">idle</strong></div>
+          <div class="op-cell"><span>TRANSCRIPT</span><strong id="opTranscript">—</strong></div>
+          <div class="op-cell"><span>INTENT</span><strong id="opIntent">—</strong></div>
+          <div class="op-cell"><span>TASK</span><strong id="opTask">—</strong></div>
+          <div class="op-approvals" id="opApprovals"></div>
+        </div>
         <div class="messages" id="messages"></div>
         <form class="hud-composer" id="chatForm">
           <input type="text" id="chatInput" placeholder="Command TONY… code, build, research, deploy" autofocus />
@@ -84,6 +91,30 @@
       <section class="panel" id="panel-systems">
         <h2>MCP & Integrations</h2>
         <div id="mcpGrid" class="mcp-grid"></div>
+        <div class="operator-actions" id="operatorActions">
+          <h3>Operator actions</h3>
+          <div class="action-row">
+            <button type="button" class="hud-btn-secondary" id="btnRepoSummary">Repo summary</button>
+            <button type="button" class="hud-btn-secondary" id="btnExplainChanges">Explain changes</button>
+            <button type="button" class="hud-btn-secondary" id="btnCommitMsg">Commit message</button>
+            <button type="button" class="hud-btn-secondary" id="btnPreparePr">Prepare PR</button>
+            <button type="button" class="hud-btn-secondary" id="btnMemorialVoice">Memorial voice</button>
+            <button type="button" class="hud-btn-secondary" id="btnBriefing">Daily briefing</button>
+            <button type="button" class="hud-btn-secondary" id="btnWorkspaces">Workspaces</button>
+            <button type="button" class="hud-btn-secondary" id="btnVaultWatch">Vault watch</button>
+            <button type="button" class="hud-btn-secondary" id="btnGenSkill">Draft skill</button>
+            <button type="button" class="hud-btn-secondary" id="btnClients">Clients</button>
+            <button type="button" class="hud-btn-secondary" id="btnMacros">Macros</button>
+            <button type="button" class="hud-btn-secondary" id="btnChangelog">Changelog</button>
+            <button type="button" class="hud-btn-secondary" id="btnFocus">Focus 25m</button>
+            <button type="button" class="hud-btn-secondary" id="btnBackup">Backup</button>
+            <button type="button" class="hud-btn-secondary" id="btnExportDelivery">Export delivery</button>
+            <button type="button" class="hud-btn-secondary" id="btnPrefs">Preferences</button>
+            <button type="button" class="hud-btn-secondary" id="btnTrustedOn">Trusted mode ON</button>
+            <button type="button" class="hud-btn-secondary" id="btnTrustedOff">Trusted mode OFF</button>
+          </div>
+          <p class="trusted-label" id="trustedLabel">Trusted mode: —</p>
+        </div>
       </section>
     </main>
   </div>

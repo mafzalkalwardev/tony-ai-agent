@@ -6,6 +6,14 @@ const localTts = require('../bridge/tts');
  * TTS chain: ElevenLabs → edge-tts/pyttsx3 local → caller uses browser speechSynthesis.
  */
 async function speak(text, options = {}) {
+  const preferLocal = options.preferLocal ?? config.voice?.preferLocalTts;
+
+  // Local-first TTS (edge-tts / pyttsx3). ElevenLabs is optional cloud; never "voice cloning".
+  if (preferLocal) {
+    const local = localTts.speak(text, options.localVoice || config.tts?.localVoice || 'en-US-GuyNeural');
+    if (local.ok) return { ...local, preferred: 'local' };
+  }
+
   const el = await elevenlabs.speak(text, options);
   if (el.ok) return el;
 

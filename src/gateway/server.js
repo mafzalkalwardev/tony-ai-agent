@@ -42,8 +42,29 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     name: 'TONY',
-    version: '2.7.0',
+    version: '2.15.0',
     llm: config.llmProvider,
+    operator: {
+      categories: require('../core/intent_router').CATEGORIES,
+      pendingApprovals: require('../safety/approvals').list('pending').length,
+      trustedMode: require('../safety/trusted_mode').status(),
+      telegram: require('../channels/telegram').status(),
+      discord: require('../channels/discord').status(),
+      memorialVoice: require('../voice/memorial_voice').status(),
+      browserOperator: require('../tools/browser_operator').status(),
+      workspace: require('../tools/workspaces').list(),
+      rateLimits: require('../safety/rate_limit').status(),
+      remindersDue: require('../tools/reminders').dueNow().length,
+      vaultWatch: require('../brain/vault_watcher').status(),
+      prefsVault: require('../tools/pref_vault').status(),
+      tonyMcp: require('../mcp/tony-server').status(),
+      embeddings: require('../memory/embeddings').status(),
+      clients: require('../tools/clients').list().clients.length,
+      macros: require('../tools/macros').list().macros.length,
+      audit: require('../safety/audit').status(),
+      focus: require('../tools/focus_timer').status(),
+      checkpoints: require('../core/checkpoints').listCheckpoints().checkpoints.length,
+    },
     llmChain: require('../llm').providerStatus(),
     online,
     connectivity: connStatus(),
@@ -60,6 +81,12 @@ app.get('/health', async (_req, res) => {
       noiseCancellation: config.voice.noiseCancellation,
       minConfidence: config.voice.minConfidence,
       highPassHz: config.voice.highPassHz,
+      silenceStopSeconds: config.voice.silenceStopSeconds,
+      silenceThreshold: config.voice.silenceThreshold,
+      useSilenceDetection: config.voice.useSilenceDetection !== false,
+      vadSpeechMult: config.voice.vadSpeechMult,
+      preferLocalStt: config.voice.preferLocalStt,
+      preferLocalTts: config.voice.preferLocalTts,
     },
     skills: require('../skills/loader').listSkills().length,
     tools: require('../tools/registry').listTools().length,
@@ -80,6 +107,52 @@ app.post('/api/chat', auth, async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/chat/stream', auth, async (req, res) => {
+  const { writeSse, chunkText, streamGroq } = require('../llm/stream');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+  try {
+    const { message, sessionId = randomUUID(), mode = 'agent' } = req.body || {};
+    if (!message) {
+      writeSse(res, 'error', { error: 'message required' });
+      return res.end();
+    }
+    writeSse(res, 'status', { state: 'thinking', sessionId });
+    if (mode === 'llm') {
+      let full = '';
+      try {
+        for await (const delta of streamGroq([{ role: 'user', content: message }])) {
+          full += delta;
+          writeSse(res, 'delta', { text: delta });
+        }
+      } catch {
+        for await (const delta of chunkText('Streaming unavailable; use /api/chat.')) {
+          full += delta;
+          writeSse(res, 'delta', { text: delta });
+        }
+      }
+      writeSse(res, 'done', { sessionId, response: full, provider: 'stream' });
+      return res.end();
+    }
+    const result = await runAgent({ sessionId, message });
+    for await (const delta of chunkText(result.response || '')) {
+      writeSse(res, 'delta', { text: delta });
+    }
+    writeSse(res, 'done', {
+      sessionId,
+      response: result.response,
+      intent: result.intent,
+      provider: result.provider,
+    });
+    res.end();
+  } catch (e) {
+    writeSse(res, 'error', { error: e.message });
+    res.end();
   }
 });
 
@@ -141,6 +214,40 @@ app.post('/api/voice/speak', auth, async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/voice/speak/stream', auth, async (req, res) => {
+  const { writeSse } = require('../llm/stream');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+  try {
+    const { text, voiceId } = req.body || {};
+    if (!text) {
+      writeSse(res, 'error', { error: 'text required' });
+      return res.end();
+    }
+    writeSse(res, 'status', { state: 'speaking' });
+    for await (const chunk of require('../voice/tts_stream').streamSpeak(text, { voiceId })) {
+      writeSse(res, 'audio', {
+        index: chunk.index,
+        total: chunk.total,
+        ok: chunk.ok,
+        provider: chunk.provider,
+        mimeType: chunk.mimeType,
+        audio: chunk.audio,
+        text: chunk.text,
+        chunkBytes: chunk.chunkBytes,
+        error: chunk.error,
+      });
+    }
+    writeSse(res, 'done', { ok: true });
+    res.end();
+  } catch (e) {
+    writeSse(res, 'error', { error: e.message });
+    res.end();
   }
 });
 
@@ -358,6 +465,459 @@ app.get('/api/local/status', auth, async (_req, res) => {
   });
 });
 
+app.post('/api/intent/route', auth, (req, res) => {
+  const { message } = req.body || {};
+  if (!message) return res.status(400).json({ error: 'message required' });
+  const routed = require('../core/intent_router').route(message);
+  const safety = require('../safety/policy').classifyIntent(routed.intent, message);
+  res.json({ ok: true, ...routed, safety });
+});
+
+app.get('/api/operator/status', auth, (_req, res) => {
+  const approvals = require('../safety/approvals');
+  res.json({
+    ok: true,
+    pendingApprovals: approvals.list('pending').slice(0, 10),
+    categories: require('../core/intent_router').CATEGORIES,
+    voice: {
+      noiseCancellation: config.voice.noiseCancellation,
+      minConfidence: config.voice.minConfidence,
+      silenceStopSeconds: config.voice.silenceStopSeconds,
+      silenceThreshold: config.voice.silenceThreshold,
+      preferLocalStt: config.voice.preferLocalStt,
+    },
+  });
+});
+
+app.get('/api/approvals', auth, (req, res) => {
+  const status = req.query.status || 'pending';
+  res.json({ ok: true, approvals: require('../safety/approvals').list(status) });
+});
+
+app.post('/api/approvals/:id', auth, (req, res) => {
+  const approved = Boolean(req.body?.approved);
+  const item = require('../safety/approvals').decide(req.params.id, approved);
+  if (!item) return res.status(404).json({ error: 'Approval not found' });
+  res.json({ ok: true, approval: item });
+});
+
+app.get('/api/project/scan', auth, (req, res) => {
+  const projectPath = req.query.path || '.';
+  const scanner = require('../tools/project_scanner');
+  res.json({ ok: true, ...scanner.scan(projectPath), text: scanner.scanAsText(projectPath) });
+});
+
+app.post('/api/delivery/prepare', auth, (req, res) => {
+  const { completedWork, limitations, path: projectPath = '.' } = req.body || {};
+  res.json(
+    require('../tools/delivery_helper').prepareDeliveryPackage({
+      projectPath,
+      completedWork,
+      limitations,
+    })
+  );
+});
+
+app.post('/api/delivery/export', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'export_delivery',
+      {
+        completedWork: req.body?.completedWork || '',
+        limitations: req.body?.limitations || '',
+      },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/github/summary', auth, (_req, res) => {
+  res.json(require('../tools/github_helper').summarizeRepo());
+});
+
+app.get('/api/github/changes', auth, (_req, res) => {
+  res.json(require('../tools/github_helper').explainChangedFiles());
+});
+
+app.post('/api/github/commit-message', auth, (req, res) => {
+  res.json(require('../tools/github_helper').generateCommitMessage(req.body?.topic || ''));
+});
+
+app.post('/api/github/prepare-pr', auth, (req, res) => {
+  res.json(require('../tools/github_helper').preparePrInstructions(req.body?.topic || ''));
+});
+
+app.post('/api/github/create-issue', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'create_issue',
+      {
+        title: req.body?.title,
+        body: req.body?.body || '',
+        approved: Boolean(req.body?.approved),
+      },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/github/create-pr', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'create_pr',
+      {
+        title: req.body?.title,
+        body: req.body?.body || '',
+        base: req.body?.base || 'master',
+        draft: Boolean(req.body?.draft),
+        approved: Boolean(req.body?.approved),
+      },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/telegram/status', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../channels/telegram').status() });
+});
+
+app.post('/api/telegram/webhook', auth, async (req, res) => {
+  try {
+    res.json(await require('../channels/telegram').handleUpdate(req.body || {}));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/telegram/send', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'telegram_send',
+      { text: req.body?.text || '', approved: Boolean(req.body?.approved) },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/discord/status', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../channels/discord').status() });
+});
+
+app.post('/api/discord/send', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'discord_send',
+      { text: req.body?.text || '', approved: Boolean(req.body?.approved) },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/discord/incoming', auth, async (req, res) => {
+  try {
+    res.json(await require('../channels/discord').handleIncoming(req.body || {}));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspaces', auth, (_req, res) => {
+  res.json(require('../tools/workspaces').list());
+});
+
+app.post('/api/workspaces', auth, (req, res) => {
+  const { action = 'list', name, path: repoPath, id } = req.body || {};
+  const ws = require('../tools/workspaces');
+  if (action === 'add') return res.json(ws.addWorkspace({ name, path: repoPath }));
+  if (action === 'switch') return res.json(ws.switchWorkspace(id || name));
+  if (action === 'remove') return res.json(ws.removeWorkspace(id || name));
+  return res.json(ws.list());
+});
+
+app.get('/api/reminders', auth, (req, res) => {
+  res.json({
+    ok: true,
+    reminders: require('../tools/reminders').list({ includeDone: req.query.includeDone === '1' }),
+    due: require('../tools/reminders').dueNow(),
+  });
+});
+
+app.post('/api/reminders', auth, (req, res) => {
+  const reminders = require('../tools/reminders');
+  if (req.body?.completeId) return res.json(reminders.completeReminder(req.body.completeId));
+  if (req.body?.briefing) return res.json(reminders.dailyBriefing());
+  res.json(
+    reminders.addReminder({
+      text: req.body?.text,
+      minutesFromNow: req.body?.minutesFromNow,
+      dueAt: req.body?.dueAt,
+    })
+  );
+});
+
+app.get('/api/briefing', auth, (_req, res) => {
+  res.json(require('../tools/reminders').dailyBriefing());
+});
+
+app.get('/api/vault/watch', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../brain/vault_watcher').status() });
+});
+
+app.post('/api/vault/watch', auth, (req, res) => {
+  const watcher = require('../brain/vault_watcher');
+  const action = req.body?.action || 'start';
+  if (action === 'stop') return res.json(watcher.stop());
+  if (action === 'sync') return res.json(watcher.syncIndex());
+  return res.json(watcher.start());
+});
+
+app.get('/api/prefs-vault', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../tools/pref_vault').status() });
+});
+
+app.post('/api/prefs-vault', auth, (req, res) => {
+  const vault = require('../tools/pref_vault');
+  const action = req.body?.action || 'seal';
+  if (action === 'open' || action === 'restore') return res.json(vault.restoreIntoLivePrefs());
+  return res.json(vault.sealFromLivePrefs());
+});
+
+app.post('/api/skills/generate', auth, (req, res) => {
+  res.json(
+    require('../skills/generate').draftFromPlaybooks({
+      name: req.body?.name,
+      query: req.body?.query,
+      write: Boolean(req.body?.write),
+    })
+  );
+});
+
+app.get('/api/mcp/tony/tools', auth, (_req, res) => {
+  res.json({ ok: true, tools: require('../mcp/tony-server').listMcpTools() });
+});
+
+app.post('/api/mcp/tony/call', auth, async (req, res) => {
+  try {
+    const { name, arguments: args = {}, sessionId = 'mcp' } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'name required' });
+    res.json(await require('../mcp/tony-server').callMcpTool(name, args, sessionId));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/mcp/tony/status', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../mcp/tony-server').status() });
+});
+
+app.get('/api/memory/embeddings', auth, (req, res) => {
+  const q = req.query.q || '';
+  if (!q) return res.json({ ok: true, ...require('../memory/embeddings').status() });
+  res.json({ ok: true, hits: require('../memory/embeddings').search(q, Number(req.query.limit || 8)) });
+});
+
+app.post('/api/memory/reindex', auth, (_req, res) => {
+  res.json(require('../memory/semantic').reindexAll());
+});
+
+app.get('/api/clients', auth, (_req, res) => {
+  res.json(require('../tools/clients').list());
+});
+
+app.post('/api/clients', auth, (req, res) => {
+  res.json(require('../tools/clients').upsertClient(req.body || {}));
+});
+
+app.get('/api/macros', auth, (_req, res) => {
+  res.json(require('../tools/macros').list());
+});
+
+app.post('/api/macros', auth, (req, res) => {
+  res.json(require('../tools/macros').saveMacro(req.body || {}));
+});
+
+app.post('/api/session/export', auth, (req, res) => {
+  res.json(
+    require('../tools/session_export').exportSession(req.body?.sessionId || 'api', {
+      limit: req.body?.limit || 100,
+    })
+  );
+});
+
+app.get('/api/checkpoints', auth, (_req, res) => {
+  res.json(require('../core/checkpoints').listCheckpoints());
+});
+
+app.post('/api/checkpoints', auth, (req, res) => {
+  const cp = require('../core/checkpoints');
+  const action = req.body?.action || 'save';
+  const sessionId = req.body?.sessionId || 'api';
+  if (action === 'restore') return res.json(cp.restoreCheckpoint(sessionId));
+  if (action === 'load') return res.json(cp.loadCheckpoint(sessionId));
+  return res.json(cp.saveCheckpoint(sessionId, { label: req.body?.label, note: req.body?.note }));
+});
+
+app.get('/api/audit', auth, (req, res) => {
+  res.json({ ok: true, entries: require('../safety/audit').recent(Number(req.query.limit || 50)) });
+});
+
+app.get('/api/changelog', auth, (req, res) => {
+  const since = req.query.since || '7 days ago';
+  res.json(require('../tools/changelog').digest({ since }));
+});
+
+app.post('/api/changelog/export', auth, (req, res) => {
+  res.json(require('../tools/changelog').exportDigest({ since: req.body?.since || '7 days ago' }));
+});
+
+app.get('/api/backups', auth, (_req, res) => {
+  res.json(require('../tools/backup').listBackups());
+});
+
+app.post('/api/backups', auth, (req, res) => {
+  res.json(require('../tools/backup').createBackup({ label: req.body?.label || 'tony-data' }));
+});
+
+app.get('/api/focus', auth, (_req, res) => {
+  res.json(require('../tools/focus_timer').status());
+});
+
+app.post('/api/focus', auth, (req, res) => {
+  const focus = require('../tools/focus_timer');
+  const action = req.body?.action || 'start';
+  if (action === 'stop') return res.json(focus.stop({ complete: Boolean(req.body?.complete) }));
+  if (action === 'status') return res.json(focus.status());
+  return res.json(focus.start({ minutes: req.body?.minutes, label: req.body?.label }));
+});
+
+app.get('/api/memorial-voice', auth, (_req, res) => {
+  const memorial = require('../voice/memorial_voice');
+  res.json({ ok: true, ...memorial.status(), voices: memorial.listVoices() });
+});
+
+app.post('/api/memorial-voice/register', auth, async (req, res) => {
+  try {
+    res.json(require('../voice/memorial_voice').registerMemorialVoice(req.body || {}));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/memorial-voice/clone', auth, async (req, res) => {
+  try {
+    res.json(await require('../voice/memorial_voice').cloneMemorialVoice(req.body?.name));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/memorial-voice/speak', auth, async (req, res) => {
+  try {
+    const { name, text } = req.body || {};
+    if (!name || !text) return res.status(400).json({ error: 'name and text required' });
+    res.json(await require('../voice/memorial_voice').speakMemorial(name, text));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/browser/operator', auth, async (req, res) => {
+  try {
+    const result = await require('../tools/registry').executeTool(
+      'browser_operator',
+      {
+        action: req.body?.action || 'status',
+        url: req.body?.url,
+        ref: req.body?.ref,
+        text: req.body?.text,
+        approved: Boolean(req.body?.approved),
+      },
+      req.body?.sessionId || 'api'
+    );
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/preferences', auth, (_req, res) => {
+  res.json({ ok: true, preferences: require('../tools/preferences').load() });
+});
+
+app.post('/api/preferences', auth, (req, res) => {
+  const prefs = require('../tools/preferences');
+  if (req.body?.projectNote) {
+    return res.json({ ok: true, preferences: prefs.addProjectNote(req.body.projectNote) });
+  }
+  res.json({ ok: true, preferences: prefs.save(req.body || {}) });
+});
+
+app.get('/api/voice/local-stt', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../voice/local_stt').status() });
+});
+
+app.get('/api/trusted-mode', auth, (_req, res) => {
+  res.json({ ok: true, ...require('../safety/trusted_mode').status() });
+});
+
+app.post('/api/trusted-mode', auth, (req, res) => {
+  const trusted = require('../safety/trusted_mode');
+  const enabled = req.body?.enabled;
+  if (enabled === true) return res.json({ ok: true, ...trusted.enable({ by: 'api' }) });
+  if (enabled === false) return res.json({ ok: true, ...trusted.disable() });
+  res.json({ ok: true, ...trusted.status() });
+});
+
+app.post('/api/research', auth, async (req, res) => {
+  try {
+    const { query, urls, openBrowser } = req.body || {};
+    if (!query) return res.status(400).json({ error: 'query required' });
+    const trusted = require('../safety/trusted_mode');
+    if (!trusted.isEnabled() && !req.body?.approved) {
+      const pending = require('../safety/approvals').create({
+        action: 'research_web',
+        command: query,
+        reason: 'API research requires approval or trusted mode',
+      });
+      return res.status(402).json({ ok: false, needsApproval: true, pendingApprovalId: pending.id });
+    }
+    res.json(await require('../tools/research_web').researchTopic(query, { urls, openBrowser }));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/decide', auth, async (req, res) => {
+  try {
+    const { message, intent } = req.body || {};
+    if (!message) return res.status(400).json({ error: 'message required' });
+    res.json(
+      await require('../core/decision_engine').decideAndMaybeExecute({
+        message,
+        intent: { intent: intent || 'unknown' },
+        sessionId: req.body?.sessionId || 'api',
+      })
+    );
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/', (_req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
@@ -382,6 +942,12 @@ wss.on('connection', (ws, req) => {
       if (msg.type === 'chat' && msg.message) {
         ws.send(JSON.stringify({ type: 'thinking' }));
         const result = await runAgent({ sessionId, message: msg.message });
+        if (msg.stream) {
+          const { chunkText } = require('../llm/stream');
+          for await (const delta of chunkText(result.response || '')) {
+            ws.send(JSON.stringify({ type: 'delta', text: delta }));
+          }
+        }
         ws.send(JSON.stringify({ type: 'response', ...result }));
         return;
       }
@@ -407,6 +973,18 @@ if (require.main === module) {
   server.listen(config.port, () => {
     console.log(`TONY gateway listening on http://localhost:${config.port}`);
     console.log(`WebSocket: ws://localhost:${config.port}/ws?token=***`);
+    if (config.telegram?.polling && config.telegram?.botToken) {
+      require('../channels/telegram')
+        .startPolling()
+        .then((r) => console.log('Telegram polling:', r.ok ? 'on' : r.error))
+        .catch((e) => console.warn('Telegram polling failed:', e.message));
+    }
+    try {
+      const watch = require('../brain/vault_watcher').start();
+      if (watch.ok) console.log('Obsidian vault watcher: on');
+    } catch (e) {
+      console.warn('Vault watcher:', e.message);
+    }
   });
 }
 
